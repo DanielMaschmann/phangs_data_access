@@ -3,22 +3,27 @@ class to gather all information need to access PHANGS observational data product
 """
 
 # TO DO add missing galaxies !!!!
+
+
+
 phangs_alma_galaxy_list = [
     'ic1954', 'ic5332', 'ngc0628', 'ngc0685', 'ngc1087', 'ngc1097', 'ngc1300', 'ngc1317', 'ngc1365', 'ngc1385',
     'ngc1433', 'ngc1512', 'ngc1559', 'ngc1566', 'ngc1672', 'ngc1792', 'ngc2775', 'ngc2835', 'ngc2903',
     'ngc3351', 'ngc3621', 'ngc3627', 'ngc4254', 'ngc4298', 'ngc4303', 'ngc4321', 'ngc4535', 'ngc4536', 'ngc4548',
     'ngc4569', 'ngc4571', 'ngc4654', 'ngc4689', 'ngc4826', 'ngc5068', 'ngc5248', 'ngc6744', 'ngc7496'
 ]
-phangs_hst_galaxy_list = [
-    'ic1954', 'ic5332', 'ngc0628', 'ngc0685', 'ngc1087', 'ngc1097', 'ngc1300', 'ngc1317', 'ngc1365', 'ngc1385',
+phangs_treasury_hst_galaxy_list = [
+    'ic1954', 'ic5332', 'ngc0628', 'ngc0628c', 'ngc0628e', 'ngc0685', 'ngc1087', 'ngc1097', 'ngc1300', 'ngc1317', 'ngc1365', 'ngc1385',
     'ngc1433', 'ngc1510', 'ngc1512', 'ngc1559', 'ngc1566', 'ngc1672', 'ngc1792', 'ngc2775', 'ngc2835', 'ngc2903',
     'ngc3351', 'ngc3621', 'ngc3627', 'ngc4254', 'ngc4298', 'ngc4303', 'ngc4321', 'ngc4535', 'ngc4536', 'ngc4548',
     'ngc4569', 'ngc4571', 'ngc4654', 'ngc4689', 'ngc4826', 'ngc5068', 'ngc5248', 'ngc6744', 'ngc7496'
 ]
-phangs_jwst_galaxy_list = [
+phangs_add_hst_galaxy_list = ['ngc5194']
+phangs_treasury_jwst_galaxy_list = [
     'ic5332', 'ngc0628', 'ngc1087', 'ngc1300', 'ngc1365', 'ngc1385', 'ngc1433', 'ngc1512', 'ngc1566', 'ngc1672',
     'ngc2835', 'ngc3351', 'ngc3627', 'ngc4254', 'ngc4303', 'ngc4321', 'ngc4535', 'ngc5068', 'ngc7496'
 ]
+phangs_add_jwst_galaxy_list = ['ngc5194']
 phangs_muse_galaxy_list = [
     'ic5332', 'ngc0628', 'ngc1087', 'ngc1300', 'ngc1365', 'ngc1385', 'ngc1433', 'ngc1512', 'ngc1566', 'ngc1672',
     'ngc2835', 'ngc3351', 'ngc3627', 'ngc4254', 'ngc4303', 'ngc4321', 'ngc4535', 'ngc5068', 'ngc7496'
@@ -34,192 +39,264 @@ hst_cluster_cat_target_list = ['ic1954', 'ic5332', 'ngc0628e', 'ngc0628c', 'ngc0
                                'ngc4535', 'ngc4536', 'ngc4548', 'ngc4569', 'ngc4571', 'ngc4654', 'ngc4689',
                                'ngc4826', 'ngc5068', 'ngc5248', 'ngc6744', 'ngc7496']
 
+hst_cluster_cat_hst_ha_target_list = ['ic5332', 'ngc0628e', 'ngc0628c', 'ngc1087', 'ngc1300', 'ngc1365', 'ngc1385',
+                                      'ngc1433', 'ngc1512', 'ngc1566', 'ngc1672', 'ngc3351', 'ngc3627', 'ngc4254',
+                                      'ngc4303', 'ngc4321', 'ngc5068', 'ngc7496']
+
 # specification of observed bands for each HST target here we prefer to have a mosaic as a final product
 hst_obs_band_dict = {
     'ic1954':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ic5332':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F658N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc0628':
         {'acs': ['F435W', 'F814W'],
+         'uvis': ['F275W', 'F336W'],
+         'acs_uvis': ['F555W', 'F658N'],
+         'ir': []},
+    'ngc0628c':
+        {'acs': ['F435W', 'F555W', 'F658N', 'F814W'],
+         'uvis': ['F275W', 'F336W'],
+         'acs_uvis': [],
+         'ir': []},
+    'ngc0628e':
+        {'acs': ['F435W', 'F814W'],
          'uvis': ['F275W', 'F336W', 'F555W', 'F658N'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc0685':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc1087':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc1097':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc1300':
         {'acs': ['F435W', 'F555W', 'F658N', 'F814W'],
          'uvis': ['F275W', 'F336W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc1317':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc1365':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc1385':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc1433':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc1512':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F658N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
+    'ngc1510':
+        {'acs': [],
+         'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F658N', 'F814W'],
+         'acs_uvis': [],
+         'ir': []},
     'ngc1559':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc1566':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F658N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc1672':
         {'acs': ['F435W', 'F658N', 'F814W'],
          'uvis': ['F275W', 'F336W', 'F555W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc1792':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc2775':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc2835':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F658N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc2903':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc2997e':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc3059':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc3351':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc3368':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc3621':
         {'acs': ['F435W', 'F555W', 'F814W'],
          'uvis': ['F275W', 'F336W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc3627':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F658N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc4254':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc4298':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc4303':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F658N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc4321':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc4424':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc4535':
         {'acs': [],
-         'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F814W'],
-         'acs_uvis': []},
+         'uvis': ['F275W', 'F336W', 'F438W', 'F555W',
+                  'F657N',
+                  'F814W'],
+         'acs_uvis': [],
+         'ir': []},
     'ngc4536':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc4548':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc4569':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc4571':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc4654':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc4689':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc4694':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc4731':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc4826':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc4951':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc5068':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F658N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
+    # 'ngc5194':
+    #     {'acs': ['F435W', 'F555W', 'F658N', 'F814W'],
+    #      'uvis': ['F275W', 'F336W'],
+    #      'acs_uvis': [],
+    #      'ir}: [,
     'ngc5248':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc6744':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc7496':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
-         'acs_uvis': []},
+         'acs_uvis': [],
+         'ir': []},
     'ngc7793':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W'],
-         'acs_uvis': ['F555W', 'F814W']},
+         'acs_uvis': ['F555W', 'F814W'],
+         'ir': []},
         }
 
 hst_ha_cont_sub_dict = {
@@ -472,6 +549,20 @@ hst_cluster_cat_obs_band_dict = {
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F814W']},
         }
+
+############################
+##### PSF availability #####
+############################
+acs_wfc_psf_band_list = ['F435W', 'F475W', 'F606W', 'F625W', 'F658N', 'F775W', 'F814W', 'F850L']
+wfc3_uv_psf_band_list = ['F225W', 'F275W', 'F336W', 'F390W', 'F438W', 'F467M', 'F555W', 'F606W', 'F621M', 'F775W', 'F814W',
+                    'F850L']
+wfc3_ir_psf_band_list = ['F098M', 'F105W', 'F110W', 'F125W', 'F127M', 'F140W', 'F153M', 'F160W']
+
+
+
+
+
+
 
 
 class OLDPhangsObsInfo:

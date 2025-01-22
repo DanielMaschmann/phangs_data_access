@@ -11,8 +11,7 @@ from phangs_data_access import phangs_info
 import matplotlib.pyplot as plt
 
 
-target_list = phangs_info.phangs_jwst_galaxy_list
-
+target_list = phangs_info.phangs_treasury_jwst_galaxy_list
 
 for target in target_list:
 
@@ -23,7 +22,7 @@ for target in target_list:
     phangs_phot = phot_access.PhotAccess(target_name=target)
 
     # get band list
-    band_list = helper_func.BandTools.get_nircam_obs_band_list(target=target)
+    band_list = helper_func.ObsTools.get_nircam_obs_band_list(target=target)
 
     print(target, ' bands, available: ', band_list)
     phangs_phot.load_phangs_bands(band_list=band_list)

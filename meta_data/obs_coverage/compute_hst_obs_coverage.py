@@ -10,7 +10,7 @@ from phangs_data_access import helper_func
 from phangs_data_access import phangs_info
 
 
-target_list = phangs_info.phangs_hst_galaxy_list
+target_list = phangs_info.phangs_treasury_hst_galaxy_list
 
 
 for target in target_list:
@@ -21,10 +21,10 @@ for target in target_list:
         continue
 
     # now get hst bands
-    phangs_phot = phot_access.PhotAccess(target_name=target)
+    phangs_phot = phot_access.PhotAccess(phot_target_name=target)
 
     # get band list
-    band_list = helper_func.BandTools.get_hst_obs_band_list(target=target)
+    band_list = helper_func.ObsTools.get_hst_obs_band_list(target=target)
 
     print(target, ' bands, available: ', band_list)
 

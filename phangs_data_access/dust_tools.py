@@ -71,8 +71,9 @@ class DustTools:
     @staticmethod
     def get_target_gal_ext_band(target, obs, band, rad_deg=None, method='SandF', ebv_estimator='mean', ext_law='F99',
                                 r_v=3.1, wave_estimator='pivot_wave'):
-        gal_ext_ebv = DustTools.get_target_gal_ext_ebv(target=target, method=method, ebv_estimator=ebv_estimator,
-                                                       rad_deg=rad_deg)
+        gal_ext_ebv = DustTools.get_target_gal_ext_ebv(
+            target=helper_func.FileTools.target_name_no_directions(target=target), method=method,
+            ebv_estimator=ebv_estimator, rad_deg=rad_deg)
 
         # get wavelength
         if obs in ['hst', 'hst_ha']:

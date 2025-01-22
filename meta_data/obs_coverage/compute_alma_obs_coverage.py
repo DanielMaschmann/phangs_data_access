@@ -21,7 +21,7 @@ for target in target_list:
     print(target)
     # target = 'ngc1097'
 
-    phangs_gas = gas_access.GasAccess(target_name=target)
+    phangs_gas = gas_access.GasAccess(gas_target_name=target)
 
     for res in ['native', 150]:
 

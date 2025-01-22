@@ -2,29 +2,38 @@
 Here we assemble all physical parameters needed
 """
 
+# constants which are helpful
 sr_per_square_deg = 0.00030461741978671  # steradians per square degree
+
+#############################################
+#### Filter names for various telescopes ####
+#############################################
 
 # filter names from http://svo2.cab.inta-csic.es
 hst_acs_wfc1_bands = ['FR388N', 'FR423N', 'F435W', 'FR459M', 'FR462N', 'F475W', 'F502N', 'FR505N', 'F555W',
                       'FR551N', 'F550M', 'FR601N', 'F606W', 'F625W', 'FR647M', 'FR656N', 'F658N', 'F660N',
                       'FR716N', 'POL_UV', 'POL_V', 'G800L', 'F775W', 'FR782N', 'F814W', 'FR853N', 'F892N',
                       'FR914M', 'F850LP', 'FR931N', 'FR1016N']
-hst_wfc3_uvis2_bands = ['F218W', 'FQ232N', 'F225W', 'FQ243N', 'F275W', 'F280N', 'F300X', 'F336W', 'F343N',
-                        'F373N', 'FQ378N', 'FQ387N', 'F390M', 'F390W', 'F395N', 'F410M', 'FQ422M', 'F438W',
-                        'FQ436N', 'FQ437N', 'G280', 'F467M', 'F469N', 'F475W', 'F487N', 'FQ492N', 'F502N',
-                        'F475X', 'FQ508N', 'F555W', 'F547M', 'FQ575N', 'F606W', 'F200LP', 'FQ619N',
-                        'F621M', 'F625W', 'F631N', 'FQ634N', 'F645N', 'F350LP', 'F656N', 'F657N', 'F658N',
-                        'F665N', 'FQ672N', 'FQ674N', 'F673N', 'F680N', 'F689M', 'FQ727N', 'FQ750N',
-                        'F763M', 'F600LP', 'F775W', 'F814W', 'F845M', 'FQ889N', 'FQ906N', 'F850LP',
-                        'FQ924N', 'FQ937N', 'F953N']
+hst_wfc3_uvis_bands = ['F218W', 'FQ232N', 'F225W', 'FQ243N', 'F275W', 'F280N', 'F300X', 'F336W', 'F343N',
+                       'F373N', 'FQ378N', 'FQ387N', 'F390M', 'F390W', 'F395N', 'F410M', 'FQ422M', 'F438W',
+                       'FQ436N', 'FQ437N', 'G280', 'F467M', 'F469N', 'F475W', 'F487N', 'FQ492N', 'F502N',
+                       'F475X', 'FQ508N', 'F555W', 'F547M', 'FQ575N', 'F606W', 'F200LP', 'FQ619N',
+                       'F621M', 'F625W', 'F631N', 'FQ634N', 'F645N', 'F350LP', 'F656N', 'F657N', 'F658N',
+                       'F665N', 'FQ672N', 'FQ674N', 'F673N', 'F680N', 'F689M', 'FQ727N', 'FQ750N',
+                       'F763M', 'F600LP', 'F775W', 'F814W', 'F845M', 'FQ889N', 'FQ906N', 'F850LP',
+                       'FQ924N', 'FQ937N', 'F953N']
 nircam_bands = ['F070W', 'F090W', 'F115W', 'F140M', 'F150W', 'F162M', 'F164N', 'F150W2', 'F182M', 'F187N',
                 'F200W', 'F210M', 'F212N', 'F250M', 'F277W', 'F300M', 'F323N', 'F322W2', 'F335M', 'F356W',
                 'F360M', 'F405N', 'F410M', 'F430M', 'F444W', 'F460M', 'F466N', 'F470N', 'F480M']
 miri_bands = ['F560W', 'F770W', 'F1000W', 'F1065C', 'F1140C', 'F1130W', 'F1280W', 'F1500W', 'F1550C',
               'F1800W', 'F2100W', 'F2300C', 'F2550W']
-
 astrosat_fuv_bands = ['F148W', 'F154W', 'F169M', 'F172M']
 astrosat_nuv_bands = ['N219M', 'N242W', 'N245M', 'N263M', 'N279N']
+
+
+#######################################################
+#### wavelength data for various telescope filters ####
+#######################################################
 
 # band wavelength taken from
 # http://svo2.cab.inta-csic.es/svo/theory/fps3/index.php?mode=browse&gname=HST&gname2=ACS_WFC&asttype=
@@ -57,7 +66,7 @@ hst_acs_wfc1_bands_wave = {
     'FR853N': {'pivot_wave': 8528.34, 'mean_wave': 8528.80, 'min_wave': 8395.60, 'max_wave': 8661.95, 'w_eff': 150.70, 'zp_vega': 2225.22},
     'F892N': {'pivot_wave': 8914.98, 'mean_wave': 8915.37, 'min_wave': 8788.92, 'max_wave': 9035.83, 'w_eff': 148.57, 'zp_vega': 2286.48},
     'FR914M': {'pivot_wave': 9067.53, 'mean_wave': 9079.84, 'min_wave': 8350.59, 'max_wave': 9802.04, 'w_eff': 738.22, 'zp_vega': 2258.98},
-    'F850LP': {'pivot_wave': 9031.48, 'mean_wave': 9080.26, 'min_wave': 8007.01, 'max_wave': 10862.13, 'w_eff': 1321.98, 'zp_vega': 2232.90},
+    'F850L': {'pivot_wave': 9031.48, 'mean_wave': 9080.26, 'min_wave': 8007.01, 'max_wave': 10862.13, 'w_eff': 1321.98, 'zp_vega': 2232.90},
     'FR931N': {'pivot_wave': 9305.64, 'mean_wave': 9306.31, 'min_wave': 9133.28, 'max_wave': 9479.02, 'w_eff': 192.32, 'zp_vega': 2238.73},
     'FR1016N': {'pivot_wave': 10149.49, 'mean_wave': 10150.22, 'min_wave': 9966.99, 'max_wave': 10335.19, 'w_eff': 193.21, 'zp_vega': 2035.05},
 }
@@ -121,7 +130,7 @@ hst_wfc3_uvis1_bands_wave = {
     'F845M': {'pivot_wave': 8439.08, 'mean_wave': 8449.34, 'min_wave': 7896.09, 'max_wave': 9019.64, 'w_eff': 825.63, 'zp_vega': 2276.99},
     'FQ889N': {'pivot_wave': 8892.27, 'mean_wave': 8892.56, 'min_wave': 8706.82, 'max_wave': 9030.90, 'w_eff': 98.51, 'zp_vega': 2246.74},
     'FQ906N': {'pivot_wave': 9057.90, 'mean_wave': 9058.19, 'min_wave': 8870.92, 'max_wave': 9159.61, 'w_eff': 98.49, 'zp_vega': 2249.04},
-    'F850LP': {'pivot_wave': 9176.14, 'mean_wave': 9207.49, 'min_wave': 8254.88, 'max_wave': 10980.16, 'w_eff': 1230.45, 'zp_vega': 2227.61},
+    'F850L': {'pivot_wave': 9176.14, 'mean_wave': 9207.49, 'min_wave': 8254.88, 'max_wave': 10980.16, 'w_eff': 1230.45, 'zp_vega': 2227.61},
     'FQ924N': {'pivot_wave': 9247.72, 'mean_wave': 9247.91, 'min_wave': 9146.28, 'max_wave': 9336.10, 'w_eff': 91.58, 'zp_vega': 2097.74},
     'FQ937N': {'pivot_wave': 9372.66, 'mean_wave': 9372.90, 'min_wave': 9262.19, 'max_wave': 9486.78, 'w_eff': 93.60, 'zp_vega': 2332.02},
     'F953N': {'pivot_wave': 9530.87, 'mean_wave': 9531.11, 'min_wave': 9320.27, 'max_wave': 9724.71, 'w_eff': 97.13, 'zp_vega': 2045.38},
@@ -191,51 +200,72 @@ hst_wfc3_uvis2_bands_wave = {
     'FQ937N': {'pivot_wave': 9372.66, 'mean_wave': 9372.90, 'min_wave': 9372.90, 'max_wave': 9486.78, 'w_eff': 93.60, 'zp_vega': 2332.02},
     'F953N': {'pivot_wave': 9530.79, 'mean_wave': 9531.11, 'min_wave': 9531.11, 'max_wave': 9722.63, 'w_eff': 96.76, 'zp_vega': 2045.39},
 }
+
+hst_wfc3_ir_bands_wave = {
+    'F098M': {'pivot_wave': 9862.72, 'mean_wave': 9900.03, 'min_wave': 8894.54, 'max_wave': 10848.68, 'w_eff': 1485.01, 'zp_vega': 2136.12},
+    'G102': {'pivot_wave': 9989.86, 'mean_wave': 10116.70, 'min_wave': 8000.00, 'max_wave': 11724.79, 'w_eff': 2430.91, 'zp_vega': 2074.54},
+    'F105W': {'pivot_wave': 10550.25, 'mean_wave': 10651.00, 'min_wave': 8955.24, 'max_wave': 12130.55, 'w_eff': 2371.97, 'zp_vega': 1974.81},
+    'F110W': {'pivot_wave': 11534.46, 'mean_wave': 11797.14, 'min_wave': 8845.79, 'max_wave': 14122.58, 'w_eff': 3856.85, 'zp_vega': 1775.57},
+    'F125W': {'pivot_wave': 12486.07, 'mean_wave': 12576.18, 'min_wave': 10853.22, 'max_wave': 14141.73, 'w_eff': 2674.40, 'zp_vega': 1555.41},
+    'F126N': {'pivot_wave': 12585.43, 'mean_wave': 12585.67, 'min_wave': 12481.60, 'max_wave': 12692.56, 'w_eff': 149.85, 'zp_vega': 1524.51},
+    'F127M': {'pivot_wave': 12741.07, 'mean_wave': 12746.22, 'min_wave': 12268.83, 'max_wave': 13235.27, 'w_eff': 673.44, 'zp_vega': 1469.99},
+    'F128N': {'pivot_wave': 12836.65, 'mean_wave': 12837.00, 'min_wave': 12729.50, 'max_wave': 12947.67, 'w_eff': 157.47, 'zp_vega': 1366.21},
+    'F130N': {'pivot_wave': 13010.38, 'mean_wave': 13010.63, 'min_wave': 12904.91, 'max_wave': 13116.80, 'w_eff': 154.57, 'zp_vega': 1448.43},
+    'F132N': {'pivot_wave': 13193.46, 'mean_wave': 13193.72, 'min_wave': 13084.22, 'max_wave': 13302.38, 'w_eff': 158.69, 'zp_vega': 1419.26},
+    'F139M': {'pivot_wave': 13841.81, 'mean_wave': 13846.00, 'min_wave': 13403.18, 'max_wave': 14303.22, 'w_eff': 630.71, 'zp_vega': 1317.21},
+    'F140W': {'pivot_wave': 13923.21, 'mean_wave': 14061.91, 'min_wave': 11864.94, 'max_wave': 16133.14, 'w_eff': 3569.86, 'zp_vega': 1321.43},
+    'G141': {'pivot_wave': 13886.72, 'mean_wave': 14184.79, 'min_wave': 10436.79, 'max_wave': 17780.13, 'w_eff': 4917.01, 'zp_vega': 1355.32},
+    'F153M': {'pivot_wave': 15332.75, 'mean_wave': 15336.98, 'min_wave': 14869.68, 'max_wave': 15828.81, 'w_eff': 692.30, 'zp_vega': 1119.04},
+    'F160W': {'pivot_wave': 15370.34, 'mean_wave': 15436.30, 'min_wave': 13857.70, 'max_wave': 17003.09, 'w_eff': 2750.15, 'zp_vega': 1122.80},
+    'F164N': {'pivot_wave': 16449.96, 'mean_wave': 16450.31, 'min_wave': 16308.82, 'max_wave': 16591.89, 'w_eff': 206.74, 'zp_vega': 983.46},
+    'F167N': {'pivot_wave': 16676.00, 'mean_wave': 16676.59, 'min_wave': 16533.47, 'max_wave': 16821.47, 'w_eff': 208.88, 'zp_vega': 1006.74}
+}
+
 nircam_bands_wave = {
-    'F070W': {'pivot_wave': 7039.12, 'mean_wave': 7088.30, 'min_wave': 6048.20, 'max_wave': 7927.07, 'zp_vega': 2768.40},
-    'F090W': {'pivot_wave': 9021.53, 'mean_wave': 9083.40, 'min_wave': 7881.88, 'max_wave': 10243.08, 'zp_vega': 2244.95},
-    'F115W': {'pivot_wave': 11542.61, 'mean_wave': 11623.89, 'min_wave': 9975.60, 'max_wave': 13058.40, 'zp_vega': 1746.12},
-    'F140M': {'pivot_wave': 14053.23, 'mean_wave': 14074.46, 'min_wave': 13042.25, 'max_wave': 15058.58, 'zp_vega': 1288.65},
-    'F150W': {'pivot_wave': 15007.44, 'mean_wave': 15104.23, 'min_wave': 13041.19, 'max_wave': 16948.89, 'zp_vega': 1172.06},
-    'F162M': {'pivot_wave': 16272.47, 'mean_wave': 16296.59, 'min_wave': 15126.16, 'max_wave': 17439.17, 'zp_vega': 1023.04},
-    'F164N': {'pivot_wave': 16445.36, 'mean_wave': 16445.95, 'min_wave': 16171.41, 'max_wave': 16717.72, 'zp_vega': 985.58},
-    'F150W2': {'pivot_wave': 16592.11, 'mean_wave': 17865.58, 'min_wave': 9774.71, 'max_wave': 23946.87, 'zp_vega': 1149.94},
-    'F182M': {'pivot_wave': 18451.67, 'mean_wave': 18494.30, 'min_wave': 16959.53, 'max_wave': 20010.97, 'zp_vega': 844.94},
-    'F187N': {'pivot_wave': 18738.99, 'mean_wave': 18739.65, 'min_wave': 18445.28, 'max_wave': 19029.98, 'zp_vega': 794.85},
-    'F200W': {'pivot_wave': 19886.48, 'mean_wave': 20028.15, 'min_wave': 17249.08, 'max_wave': 22596.64, 'zp_vega': 757.65},
-    'F210M': {'pivot_wave': 20954.51, 'mean_wave': 20982.22, 'min_wave': 19618.54, 'max_wave': 22337.29, 'zp_vega': 688.03},
-    'F212N': {'pivot_wave': 21213.18, 'mean_wave': 21213.97, 'min_wave': 20900.93, 'max_wave': 21524.99, 'zp_vega': 674.83},
-    'F250M': {'pivot_wave': 25032.33, 'mean_wave': 25049.39, 'min_wave': 23935.49, 'max_wave': 26177.91, 'zp_vega': 504.65},
-    'F277W': {'pivot_wave': 27617.40, 'mean_wave': 27844.64, 'min_wave': 23673.12, 'max_wave': 32203.22, 'zp_vega': 430.14},
-    'F300M': {'pivot_wave': 29891.21, 'mean_wave': 29940.44, 'min_wave': 27703.55, 'max_wave': 32505.92, 'zp_vega': 369.65},
-    'F323N': {'pivot_wave': 32368.53, 'mean_wave': 32369.29, 'min_wave': 32046.29, 'max_wave': 32761.07, 'zp_vega': 320.94},
-    'F322W2': {'pivot_wave': 32319.76, 'mean_wave': 33334.98, 'min_wave': 23851.45, 'max_wave': 41234.69, 'zp_vega': 343.30},
-    'F335M': {'pivot_wave': 33620.67, 'mean_wave': 33675.24, 'min_wave': 31203.36, 'max_wave': 36442.23, 'zp_vega': 298.91},
-    'F356W': {'pivot_wave': 35683.62, 'mean_wave': 35934.49, 'min_wave': 30732.91, 'max_wave': 40801.26, 'zp_vega': 271.39},
-    'F360M': {'pivot_wave': 36241.76, 'mean_wave': 36298.10, 'min_wave': 33260.34, 'max_wave': 39037.39, 'zp_vega': 260.31},
-    'F405N': {'pivot_wave': 40516.53, 'mean_wave': 40517.39, 'min_wave': 40097.87, 'max_wave': 40966.10, 'zp_vega': 206.97},
-    'F410M': {'pivot_wave': 40822.38, 'mean_wave': 40886.55, 'min_wave': 37763.56, 'max_wave': 44048.41, 'zp_vega': 208.75},
-    'F430M': {'pivot_wave': 42812.58, 'mean_wave': 42829.39, 'min_wave': 41227.68, 'max_wave': 44448.79, 'zp_vega': 190.70},
-    'F444W': {'pivot_wave': 44043.15, 'mean_wave': 44393.50, 'min_wave': 38039.57, 'max_wave': 50995.50, 'zp_vega': 184.10},
-    'F460M': {'pivot_wave': 46299.28, 'mean_wave': 46315.57, 'min_wave': 44652.64, 'max_wave': 48146.41, 'zp_vega': 164.11},
-    'F466N': {'pivot_wave': 46544.30, 'mean_wave': 46545.31, 'min_wave': 46021.35, 'max_wave': 47042.62, 'zp_vega': 157.77},
-    'F470N': {'pivot_wave': 47077.91, 'mean_wave': 47078.82, 'min_wave': 46553.98, 'max_wave': 47566.82, 'zp_vega': 159.50},
-    'F480M': {'pivot_wave': 48181.95, 'mean_wave': 48213.27, 'min_wave': 45820.02, 'max_wave': 50919.02, 'zp_vega': 153.22},
+    'F070W': {'pivot_wave': 7039.12, 'mean_wave': 7088.30, 'min_wave': 6048.20, 'max_wave': 7927.07, 'w_eff': 1212.84, 'zp_vega': 2768.40},
+    'F090W': {'pivot_wave': 9021.53, 'mean_wave': 9083.40, 'min_wave': 7881.88, 'max_wave': 10243.08, 'w_eff': 1772.74, 'zp_vega': 2244.95},
+    'F115W': {'pivot_wave': 11542.61, 'mean_wave': 11623.89, 'min_wave': 9975.60, 'max_wave': 13058.40, 'w_eff': 2055.13, 'zp_vega': 1746.12},
+    'F140M': {'pivot_wave': 14053.23, 'mean_wave': 14074.46, 'min_wave': 13042.25, 'max_wave': 15058.58, 'w_eff': 1367.40, 'zp_vega': 1288.65},
+    'F150W': {'pivot_wave': 15007.44, 'mean_wave': 15104.23, 'min_wave': 13041.19, 'max_wave': 16948.89, 'w_eff': 2890.43, 'zp_vega': 1172.06},
+    'F162M': {'pivot_wave': 16272.47, 'mean_wave': 16296.59, 'min_wave': 15126.16, 'max_wave': 17439.17, 'w_eff': 1626.29, 'zp_vega': 1023.04},
+    'F164N': {'pivot_wave': 16445.36, 'mean_wave': 16445.95, 'min_wave': 16171.41, 'max_wave': 16717.72, 'w_eff': 200.10, 'zp_vega': 985.58},
+    'F150W2': {'pivot_wave': 16592.11, 'mean_wave': 17865.58, 'min_wave': 9774.71, 'max_wave': 23946.87, 'w_eff': 9389.16, 'zp_vega': 1149.94},
+    'F182M': {'pivot_wave': 18451.67, 'mean_wave': 18494.30, 'min_wave': 16959.53, 'max_wave': 20010.97, 'w_eff': 2250.81, 'zp_vega': 844.94},
+    'F187N': {'pivot_wave': 18738.99, 'mean_wave': 18739.65, 'min_wave': 18445.28, 'max_wave': 19029.98, 'w_eff': 236.69, 'zp_vega': 794.85},
+    'F200W': {'pivot_wave': 19886.48, 'mean_wave': 20028.15, 'min_wave': 17249.08, 'max_wave': 22596.64, 'w_eff': 4190.39, 'zp_vega': 757.65},
+    'F210M': {'pivot_wave': 20954.51, 'mean_wave': 20982.22, 'min_wave': 19618.54, 'max_wave': 22337.29, 'w_eff': 2055.38, 'zp_vega': 688.03},
+    'F212N': {'pivot_wave': 21213.18, 'mean_wave': 21213.97, 'min_wave': 20900.93, 'max_wave': 21524.99, 'w_eff': 274.27, 'zp_vega': 674.83},
+    'F250M': {'pivot_wave': 25032.33, 'mean_wave': 25049.39, 'min_wave': 23935.49, 'max_wave': 26177.91, 'w_eff': 1782.96, 'zp_vega': 504.65},
+    'F277W': {'pivot_wave': 27617.40, 'mean_wave': 27844.64, 'min_wave': 23673.12, 'max_wave': 32203.22, 'w_eff': 6614.61, 'zp_vega': 430.14},
+    'F300M': {'pivot_wave': 29891.21, 'mean_wave': 29940.44, 'min_wave': 27703.55, 'max_wave': 32505.92, 'w_eff': 3255.58, 'zp_vega': 369.65},
+    'F323N': {'pivot_wave': 32368.53, 'mean_wave': 32369.29, 'min_wave': 32046.29, 'max_wave': 32761.07, 'w_eff': 384.89, 'zp_vega': 320.94},
+    'F322W2': {'pivot_wave': 32319.76, 'mean_wave': 33334.98, 'min_wave': 23851.45, 'max_wave': 41234.69, 'w_eff': 11332.55, 'zp_vega': 343.30},
+    'F335M': {'pivot_wave': 33620.67, 'mean_wave': 33675.24, 'min_wave': 31203.36, 'max_wave': 36442.23, 'w_eff': 3389.42, 'zp_vega': 298.91},
+    'F356W': {'pivot_wave': 35683.62, 'mean_wave': 35934.49, 'min_wave': 30732.91, 'max_wave': 40801.26, 'w_eff': 7239.30, 'zp_vega': 271.39},
+    'F360M': {'pivot_wave': 36241.76, 'mean_wave': 36298.10, 'min_wave': 33260.34, 'max_wave': 39037.39, 'w_eff': 3584.80, 'zp_vega': 260.31},
+    'F405N': {'pivot_wave': 40516.53, 'mean_wave': 40517.39, 'min_wave': 40097.87, 'max_wave': 40966.10, 'w_eff': 454.87, 'zp_vega': 206.97},
+    'F410M': {'pivot_wave': 40822.38, 'mean_wave': 40886.55, 'min_wave': 37763.56, 'max_wave': 44048.41, 'w_eff': 4262.86, 'zp_vega': 208.75},
+    'F430M': {'pivot_wave': 42812.58, 'mean_wave': 42829.39, 'min_wave': 41227.68, 'max_wave': 44448.79, 'w_eff': 2295.14, 'zp_vega': 190.70},
+    'F444W': {'pivot_wave': 44043.15, 'mean_wave': 44393.50, 'min_wave': 38039.57, 'max_wave': 50995.50, 'w_eff': 10676.00, 'zp_vega': 184.10},
+    'F460M': {'pivot_wave': 46299.28, 'mean_wave': 46315.57, 'min_wave': 44652.64, 'max_wave': 48146.41, 'w_eff': 2309.00, 'zp_vega': 164.11},
+    'F466N': {'pivot_wave': 46544.30, 'mean_wave': 46545.31, 'min_wave': 46021.35, 'max_wave': 47042.62, 'w_eff': 535.41, 'zp_vega': 157.77},
+    'F470N': {'pivot_wave': 47077.91, 'mean_wave': 47078.82, 'min_wave': 46553.98, 'max_wave': 47566.82, 'w_eff': 510.27, 'zp_vega': 159.50},
+    'F480M': {'pivot_wave': 48181.95, 'mean_wave': 48213.27, 'min_wave': 45820.02, 'max_wave': 50919.02, 'w_eff': 3141.37, 'zp_vega': 153.22},
 }
 miri_bands_wave = {
-    'F560W': {'pivot_wave': 56352.56, 'mean_wave': 56651.28, 'min_wave': 48944.36, 'max_wave': 64279.58, 'zp_vega': 115.29},
-    'F770W': {'pivot_wave': 76393.34, 'mean_wave': 77111.39, 'min_wave': 64802.79, 'max_wave': 88382.09, 'zp_vega': 65.08},
-    'F1000W': {'pivot_wave': 99531.16, 'mean_wave': 99981.09, 'min_wave': 87645.92, 'max_wave': 111053.33, 'zp_vega': 38.51},
-    'F1065C': {'pivot_wave': 105628.39, 'mean_wave': 105681.52, 'min_wave': 100226.73, 'max_wave': 111577.48, 'zp_vega': 33.89},
-    'F1140C': {'pivot_wave': 113103.03, 'mean_wave': 113156.52, 'min_wave': 107357.90, 'max_wave': 119593.95, 'zp_vega': 29.63},
-    'F1130W': {'pivot_wave': 113085.01, 'mean_wave': 113159.44, 'min_wave': 106439.78, 'max_wave': 119874.08, 'zp_vega': 29.66},
-    'F1280W': {'pivot_wave': 128101.38, 'mean_wave': 128738.34, 'min_wave': 112674.80, 'max_wave': 143435.71, 'zp_vega': 23.52},
-    'F1500W': {'pivot_wave': 150635.06, 'mean_wave': 151469.08, 'min_wave': 131345.04, 'max_wave': 171580.84, 'zp_vega': 17.12},
-    'F1550C': {'pivot_wave': 155167.74, 'mean_wave': 155219.65, 'min_wave': 149413.67, 'max_wave': 161556.33, 'zp_vega': 15.93},
-    'F1800W': {'pivot_wave': 179837.22, 'mean_wave': 180508.31, 'min_wave': 160441.28, 'max_wave': 203000.78, 'zp_vega': 11.99},
-    'F2100W': {'pivot_wave': 207950.05, 'mean_wave': 209373.20, 'min_wave': 179077.84, 'max_wave': 244780.51, 'zp_vega': 9.06},
-    'F2300C': {'pivot_wave': 226446.44, 'mean_wave': 227630.49, 'min_wave': 196484.64, 'max_wave': 262492.33, 'zp_vega': 7.62},
-    'F2550W': {'pivot_wave': 253640.02, 'mean_wave': 254994.19, 'min_wave': 223494.34, 'max_wave': 299940.00, 'zp_vega': 6.07},
+    'F560W': {'pivot_wave': 56352.56, 'mean_wave': 56651.28, 'min_wave': 48944.36, 'max_wave': 64279.58, 'w_eff': 9461.37, 'zp_vega': 115.29},
+    'F770W': {'pivot_wave': 76393.34, 'mean_wave': 77111.39, 'min_wave': 64802.79, 'max_wave': 88382.09, 'w_eff': 18278.14, 'zp_vega': 65.08},
+    'F1000W': {'pivot_wave': 99531.16, 'mean_wave': 99981.09, 'min_wave': 87645.92, 'max_wave': 111053.33, 'w_eff': 17036.67, 'zp_vega': 38.51},
+    'F1065C': {'pivot_wave': 105628.39, 'mean_wave': 105681.52, 'min_wave': 100226.73, 'max_wave': 111577.48, 'w_eff': 5647.25, 'zp_vega': 33.89},
+    'F1140C': {'pivot_wave': 113103.03, 'mean_wave': 113156.52, 'min_wave': 107357.90, 'max_wave': 119593.95, 'w_eff': 6036.53, 'zp_vega': 29.63},
+    'F1130W': {'pivot_wave': 113085.01, 'mean_wave': 113159.44, 'min_wave': 106439.78, 'max_wave': 119874.08, 'w_eff': 7229.15, 'zp_vega': 29.66},
+    'F1280W': {'pivot_wave': 128101.38, 'mean_wave': 128738.34, 'min_wave': 112674.80, 'max_wave': 143435.71, 'w_eff': 24337.73, 'zp_vega': 23.52},
+    'F1500W': {'pivot_wave': 150635.06, 'mean_wave': 151469.08, 'min_wave': 131345.04, 'max_wave': 171580.84, 'w_eff': 29426.24, 'zp_vega': 17.12},
+    'F1550C': {'pivot_wave': 155167.74, 'mean_wave': 155219.65, 'min_wave': 149413.67, 'max_wave': 161556.33, 'w_eff': 7038.01, 'zp_vega': 15.93},
+    'F1800W': {'pivot_wave': 179837.22, 'mean_wave': 180508.31, 'min_wave': 160441.28, 'max_wave': 203000.78, 'w_eff': 29145.67, 'zp_vega': 11.99},
+    'F2100W': {'pivot_wave': 207950.05, 'mean_wave': 209373.20, 'min_wave': 179077.84, 'max_wave': 244780.51, 'w_eff': 44045.73, 'zp_vega': 9.06},
+    'F2300C': {'pivot_wave': 226446.44, 'mean_wave': 227630.49, 'min_wave': 196484.64, 'max_wave': 262492.33, 'w_eff': 43032.65, 'zp_vega': 7.62},
+    'F2550W': {'pivot_wave': 253640.02, 'mean_wave': 254994.19, 'min_wave': 223494.34, 'max_wave': 299940.00, 'w_eff': 38760.07, 'zp_vega': 6.07},
 }
 astrosat_bands_wave = {
     'F148W': {'pivot_wave': 1481.00, 'mean_wave': 1481.00, 'min_wave': 1250.27, 'max_wave': 1799.21, 'zp_vega': 3631.00},
@@ -263,116 +293,36 @@ astrosat_bands_wave = {
     'ND1': {'pivot_wave': 4354.00, 'mean_wave': 4354.00, 'min_wave': 3584.82, 'max_wave': 5452.59, 'zp_vega': 3631.00},
     'VIS3': {'pivot_wave': 4614.00, 'mean_wave': 4614.00, 'min_wave': 3878.26, 'max_wave': 5325.00, 'zp_vega': 3631.00},
 }
-# hst encircled energy for 50% and 80% of a point source
-# the computed values are interpolated for the aperture energyenclosure for the UVIS1 and UVIS2 table found at:
-# https://www.stsci.edu/hst/instrumentation/wfc3/data-analysis/photometric-calibration/uvis-encircled-energy
-# the interpolation procedure can be found at ``../hst_psf_ee/compute_hst_psf_ee.py``
-hst_encircle_apertures_wfc3_uvis1_arcsec = {
-    'F275W': {'ee50': 0.0822707423580786, 'ee80': 0.21022900763358784},
-    'F300X': {'ee50': 0.07183566878980892, 'ee80': 0.18605544880592925},
-    'F280N': {'ee50': 0.0742747695104532, 'ee80': 0.19406145107152087},
-    'F336W': {'ee50': 0.08497576396206534, 'ee80': 0.1871036106750393},
-    'F343N': {'ee50': 0.06925450666336849, 'ee80': 0.16801159420289863},
-    'F373N': {'ee50': 0.06637465395262997, 'ee80': 0.1573038842345773},
-    'F390M': {'ee50': 0.06754620972933206, 'ee80': 0.1618176197836168},
-    'F390W': {'ee50': 0.06913956513659172, 'ee80': 0.1608947211452431},
-    'F395N': {'ee50': 0.06875161033065456, 'ee80': 0.16032039433148496},
-    'F410M': {'ee50': 0.09371942446043166, 'ee80': 0.18274568084711132},
-    'F438W': {'ee50': 0.06903736698836921, 'ee80': 0.1557715430861724},
-    'F467M': {'ee50': 0.06795220286417951, 'ee80': 0.15191359135913596},
-    'F469N': {'ee50': 0.06886956521739131, 'ee80': 0.15647894645642005},
-    'F475W': {'ee50': 0.069850040445523, 'ee80': 0.15439822165766914},
-    'F487N': {'ee50': 0.09325647899910634, 'ee80': 0.17768742058449816},
-    'F475X': {'ee50': 0.0834711893424643, 'ee80': 0.1957687914096414},
-    'F200LP': {'ee50': 0.07210149198176122, 'ee80': 0.1558672656136792},
-    'F502N': {'ee50': 0.06777562136104677, 'ee80': 0.1479508771929825},
-    'F555W': {'ee50': 0.07046691129950652, 'ee80': 0.15283876757403533},
-    'F547M': {'ee50': 0.0712762460068852, 'ee80': 0.15255306603773588},
-    'F350LP': {'ee50': 0.07336316039980961, 'ee80': 0.1607216494845361},
-    'F606W': {'ee50': 0.07091174788741343, 'ee80': 0.15282094594594597},
-    'F621M': {'ee50': 0.07030923161609948, 'ee80': 0.1496267517691134},
-    'F625W': {'ee50': 0.07346899099215864, 'ee80': 0.1552398847551046},
-    'F631N': {'ee50': 0.06967976144172176, 'ee80': 0.15119572661279282},
-    'F645N': {'ee50': 0.06969593034760241, 'ee80': 0.14867894100255344},
-    'F656N': {'ee50': 0.07031221060986903, 'ee80': 0.15098054374436287},
-    'F657N': {'ee50': 0.07014802901499984, 'ee80': 0.15021556256572033},
-    'F658N': {'ee50': 0.0708986229419885, 'ee80': 0.15386164171399075},
-    'F665N': {'ee50': 0.0706210006299526, 'ee80': 0.1514525139664805},
-    'F673N': {'ee50': 0.09633659008890062, 'ee80': 0.18216850586792785},
-    'F689M': {'ee50': 0.0968180044230519, 'ee80': 0.18145735392881132},
-    'F680N': {'ee50': 0.0721983626358878, 'ee80': 0.15341682419659736},
-    'F600LP': {'ee50': 0.07462507022703989, 'ee80': 0.15720930232558142},
-    'F763M': {'ee50': 0.07236761426978819, 'ee80': 0.15524155844155846},
-    'F775W': {'ee50': 0.0733488841694809, 'ee80': 0.15742775742775744},
-    'F814W': {'ee50': 0.07625649913344887, 'ee80': 0.1674208144796381},
-    'F845M': {'ee50': 0.07625649913344887, 'ee80': 0.1674208144796381},
-    'F850LP': {'ee50': 0.07625649913344887, 'ee80': 0.1674208144796381},
-    'F953N': {'ee50': 0.07625649913344887, 'ee80': 0.1674208144796381}
+# spectroscopy gratings
+miri_gratings = {
+    'channel_1': {'FOV': (3.2, 3.7), 'pixel_size_arcsec': 0.176, 'wave_min': 4.9, 'wave_max': 7.65},
+    'channel_2': {'FOV': (4.0, 4.8), 'pixel_size_arcsec': 0.277, 'wave_min': 7.51, 'wave_max': 11.7},
+    'channel_3': {'FOV': (5.2, 6.2), 'pixel_size_arcsec': 0.387, 'wave_min': 11.55, 'wave_max': 17.98},
+    'channel_4': {'FOV': (6.6, 7.7), 'pixel_size_arcsec': 0.645, 'wave_min': 17.7, 'wave_max': 27.9},
 }
-hst_encircle_apertures_wfc3_uvis2_arcsec = {
-    'F275W': {'ee50': 0.11002563163676309, 'ee80': 0.2126182965299685},
-    'F300X': {'ee50': 0.07362485839132546, 'ee80': 0.18871158725683682},
-    'F280N': {'ee50': 0.07019743109621891, 'ee80': 0.18288455772113948},
-    'F336W': {'ee50': 0.06656083690660827, 'ee80': 0.15241806908768826},
-    'F343N': {'ee50': 0.06917672954052154, 'ee80': 0.155386012715713},
-    'F373N': {'ee50': 0.06940505900113997, 'ee80': 0.15713519952352592},
-    'F390M': {'ee50': 0.06846401585532019, 'ee80': 0.15556587707075403},
-    'F390W': {'ee50': 0.06709837054918527, 'ee80': 0.14826257459505543},
-    'F395N': {'ee50': 0.06823408871745419, 'ee80': 0.15171940763834765},
-    'F410M': {'ee50': 0.09201353485224453, 'ee80': 0.17397061426801208},
-    'F438W': {'ee50': 0.06631333191837725, 'ee80': 0.14449639655475485},
-    'F467M': {'ee50': 0.0663031226199543, 'ee80': 0.1464906333630687},
-    'F469N': {'ee50': 0.06619528826366065, 'ee80': 0.1473578475336323},
-    'F475W': {'ee50': 0.06864697401920186, 'ee80': 0.14801877934272303},
-    'F487N': {'ee50': 0.06836516751083176, 'ee80': 0.15293060409385922},
-    'F475X': {'ee50': 0.07797421609680502, 'ee80': 0.1923851203501094},
-    'F200LP': {'ee50': 0.07087352362204724, 'ee80': 0.15511143911439118},
-    'F502N': {'ee50': 0.06698717750656574, 'ee80': 0.1469007055584237},
-    'F555W': {'ee50': 0.06755263238774319, 'ee80': 0.14312530552387162},
-    'F547M': {'ee50': 0.0684225921892018, 'ee80': 0.14788227767114526},
-    'F350LP': {'ee50': 0.07050133218999785, 'ee80': 0.15470160116448328},
-    'F606W': {'ee50': 0.06889893283113621, 'ee80': 0.1469464285714286},
-    'F621M': {'ee50': 0.06885909850802763, 'ee80': 0.1482506682506683},
-    'F625W': {'ee50': 0.07011921613035137, 'ee80': 0.15006351446718422},
-    'F631N': {'ee50': 0.07010144642974017, 'ee80': 0.15391515497786035},
-    'F645N': {'ee50': 0.06977947973062194, 'ee80': 0.1532566396818634},
-    'F656N': {'ee50': 0.07016378100140383, 'ee80': 0.15726596491228073},
-    'F657N': {'ee50': 0.07006809917355372, 'ee80': 0.15509116409537171},
-    'F658N': {'ee50': 0.07000720791560186, 'ee80': 0.15564334085778783},
-    'F665N': {'ee50': 0.07103805297835149, 'ee80': 0.15450959488272922},
-    'F673N': {'ee50': 0.0703399377112186, 'ee80': 0.15386321626617377},
-    'F689M': {'ee50': 0.07224687239366137, 'ee80': 0.15868572861800856},
-    'F680N': {'ee50': 0.07155458953352282, 'ee80': 0.15526838466373355},
-    'F600LP': {'ee50': 0.07462507022703989, 'ee80': 0.15720930232558142},
-    'F763M': {'ee50': 0.07236761426978819, 'ee80': 0.15524155844155846},
-    'F775W': {'ee50': 0.0733488841694809, 'ee80': 0.15742775742775744},
-    'F814W': {'ee50': 0.09630835117773019, 'ee80': 0.18683307332293292},
-    'F845M': {'ee50': 0.09630835117773019, 'ee80': 0.18683307332293292},
-    'F850LP': {'ee50': 0.09630835117773019, 'ee80': 0.18683307332293292},
-    'F953N': {'ee50': 0.09630835117773019, 'ee80': 0.18683307332293292}
+nirspec_gratings = {
+'G140M/F070LP': {'wave_min': 0.90, 'wave_max': 1.27},
+'G140M/F100LP': {'wave_min': 0.97, 'wave_max': 1.89},
+'G235M/F170LP': {'wave_min': 1.66, 'wave_max': 3.17},
+'G395M/F290LP': {'wave_min': 2.87, 'wave_max': 5.27},
+'G140H/F070LP': {'wave_min': 0.95, 'wave_max': 1.27},
+'G140H/F100LP': {'wave_min': 0.97, 'wave_max': 1.89},
+'G235H/F170LP': {'wave_min': 1.66, 'wave_max': 3.17},
+'G395H/F290LP': {'wave_min': 2.87, 'wave_max': 5.27}
 }
-hst_encircle_apertures_acs_wfc1_arcsec = {
-    'F435W': {'ee50': 0.07552552552552552, 'ee80': 0.15851063829787237},
-    'F475W': {'ee50': 0.0750733137829912, 'ee80': 0.15625000000000003},
-    'F502N': {'ee50': 0.07514619883040935, 'ee80': 0.15625000000000003},
-    'F555W': {'ee50': 0.07529411764705882, 'ee80': 0.1563829787234043},
-    'F550M': {'ee50': 0.07544378698224852, 'ee80': 0.15652173913043482},
-    'F606W': {'ee50': 0.07582582582582582, 'ee80': 0.15568181818181823},
-    'F625W': {'ee50': 0.07615384615384616, 'ee80': 0.15581395348837213},
-    'F658N': {'ee50': 0.07640625000000001, 'ee80': 0.15681818181818186},
-    'F660N': {'ee50': 0.07648902821316614, 'ee80': 0.15681818181818186},
-    'F775W': {'ee50': 0.07888513513513513, 'ee80': 0.16603773584905665},
-    'F814W': {'ee50': 0.08079584775086505, 'ee80': 0.17500000000000007},
-    'F892N': {'ee50': 0.0914179104477612, 'ee80': 0.22096774193548396},
-    'F850LP': {'ee50': 0.09393939393939393, 'ee80': 0.23529411764705882}
-}
+
+
+#######################################################################
+#### estimations of encircled energy for various telescope filters ####
+#######################################################################
+
 # nircam encircled energy for filters
 # taken from Table 2 in:
 # https://jwst-docs.stsci.edu/jwst-near-infrared-camera/nircam-performance/nircam-point-spread-functions
 # We use the empirical EE estimation
 # Latest updates of webpage 27 Nov 2022
 # version April/23/2023
-nircam_encircle_apertures_arcsec = {
+nircam_empirical_ee_apertures_arcsec = {
     'F070W': {'ee50': 0.038, 'ee80': 0.173},
     'F090W': {'ee50': 0.034, 'ee80': 0.157},
     'F115W': {'ee50': 0.029, 'ee80': 0.148},
@@ -403,25 +353,29 @@ nircam_encircle_apertures_arcsec = {
     'F470N': {'ee50': 0.091, 'ee80': 0.294},
     'F480M': {'ee50': 0.094, 'ee80': 0.301}
 }
-# MIRI encircled energy for filters
-# taken from Table 2 in:
+
+# For MIRI encircled energy is a bit more tricky
+# the data is taken from:
 # https://jwst-docs.stsci.edu/jwst-mid-infrared-instrument/miri-performance/miri-point-spread-functions
-# version 11/11/2022
-miri_encircle_apertures_arcsec = {
-    'F560W': {'ee50': 0.131, 'ee80': 0.422},
-    'F770W': {'ee50': 0.168, 'ee80': 0.519},
-    'F1000W': {'ee50': 0.209, 'ee80': 0.636},
-    'F1130W': {'ee50': 0.236, 'ee80': 0.712},
-    'F1280W': {'ee50': 0.266, 'ee80': 0.801},
-    'F1500W': {'ee50': 0.307, 'ee80': 0.932},
-    'F1800W': {'ee50': 0.367, 'ee80': 1.110},
-    'F2100W': {'ee50': 0.420, 'ee80': 1.276},
-    'F2550W': {'ee50': 0.510, 'ee80': 1.545}
+# version 12/06/2022
+# here we gather the FWHM from empirical measurements and the according ee energy value
+miri_empirical_ee_apertures_arcsec = {
+    'F560W': {'FWHM': 0.207, 'ee': 0.59},
+    'F770W': {'FWHM': 0.269, 'ee': 0.62},
+    'F1000W': {'FWHM': 0.328, 'ee': 0.71},
+    'F1130W': {'FWHM': 0.375, 'ee': 0.73},
+    'F1280W': {'FWHM': 0.420, 'ee': 0.65},
+    'F1500W': {'FWHM': 0.488, 'ee': 0.77},
+    'F1800W': {'FWHM': 0.591, 'ee': 0.74},
+    'F2100W': {'FWHM': 0.674, 'ee': 0.72},
+    'F2550W': {'FWHM': 0.803, 'ee': 0.68}
 }
 
-
-# parameters to compute photometry
-
+############################################################
+#### aperture corrections for various telescope filters ####
+############################################################
+#
+# aperture correction see also Deger + 2022 or 2021
 hst_broad_band_aperture_4px_corr = {
     'ic1954': {'F275W': -0.81, 'F336W': -0.74, 'F438W': -0.65, 'F555W': -0.62, 'F814W': -0.74},
     'ic5332': {'F275W': -0.78, 'F336W': -0.71, 'F438W': -0.62, 'F555W': -0.59, 'F814W': -0.71},
@@ -464,11 +418,6 @@ hst_broad_band_aperture_4px_corr = {
     'ngc6744': {'F275W': -0.73, 'F336W': -0.66, 'F438W': -0.57, 'F555W': -0.54, 'F814W': -0.66},
     'ngc7496': {'F275W': -0.73, 'F336W': -0.66, 'F438W': -0.57, 'F555W': -0.54, 'F814W': -0.66},
 }
-
-
-
-
-
 
 # aperture corr for H-alpha estimated via interpolation by Jimena
 # for key in hst_broad_band_aperture_4px_corr.keys():
@@ -520,7 +469,6 @@ hst_ha_aperture_4px_corr = {
 
 # aperture correction for nircam
 # measured by brad for a
-
 nircam_aperture_corr = {
     'F200W': {'ap_corr': -0.63, 'n_pix': 4},
     'F300M': {'ap_corr': -0.68, 'n_pix': 2},
@@ -554,5 +502,259 @@ miri_bkg_annulus_radii_arcsec = {
 }
 
 
+'''
+ionized emission line wavelength
+the vacuum wavelength are taken from the nburst fitting procedure under spiker/client/lib/eml_list_gen.pro
+the air wavelength are taken from http://astronomy.nmsu.edu/drewski/tableofemissionlines.html
+further information:
+overview on most vacuum wavelength in SDSS spectra http://classic.sdss.org/dr6/algorithms/linestable.html
+see also from the pyneb package
+or look a more detailed data base at at https://physics.nist.gov/PhysRefData/ASD/lines_form.html
+the wavelength are in :math: `\\AA´
+the emission line names are the vacuum wavelength rounded to integer
+'''
+opt_line_wave = {
+    3347: {'line_name': 'nev',
+           'transition': 'forbidden',
+           'air_wave': 3345.821,
+           'vac_wave': 3346.783,
+           'nbursts_name': '[Ne V] 3346'},
+    3427: {'line_name': 'nev',
+            'transition': 'forbidden',
+            'air_wave': 3425.881,
+            'vac_wave': 3426.863,
+            'nbursts_name': '[Ne V] 3426'},
+    3727: {'line_name': 'oii',
+            'transition': 'forbidden',
+            'air_wave': 3726.032,
+            'vac_wave': 3727.092,
+            'nbursts_name': '[O II] 3727',
+            'rcsed_name': 'OII3727.09'},
+    3730: {'line_name': 'oii',
+            'transition': 'forbidden',
+            'air_wave': 3728.815,
+            'vac_wave': 3729.875,
+            'nbursts_name': '[O II] 3729',
+            'rcsed_name': 'OII3729.88'},
+    3751: {'line_name': 'h_kappa',
+            'transition': 'balmer',
+            'air_wave': 3750.158,
+            'vac_wave': 3751.224,
+            'nbursts_name': 'H12 3751',
+            'rcsed_name': 'H_kappa3751.22'},
+    3772: {'line_name': 'h_iota',
+            'transition': 'balmer',
+            'air_wave': 3770.637,
+            'vac_wave': 3771.708,
+            'nbust_name': 'H11 3771',
+            'rcsed_name': 'H_iota3771.70'},
+    3799: {'line_name': 'h_theta',
+            'transition': 'forbidden',
+            'air_wave': 3797.904,
+            'vac_wave': 3798.982,
+            'nbursts_name': 'H10 3798',
+            'rcsed_name': 'H_theta3798.98'},
+    3836: {'line_name': 'h_eta',
+            'transition': 'balmer',
+            'air_wave': 3835.391,
+            'vac_wave': 3836.479,
+            'nbursts_name': 'H9 3836',
+            'rcsed_name': 'H_eta3836.47'},
+    3870: {'line_name': 'neiii',
+            'transition': 'forbidden',
+            'air_wave': 3868.760,
+            'vac_wave': 3869.857,
+            'nbursts_name': '[Ne III] 3869',
+            'rcsed_name': 'NeIII3869.86'},
+    3889: {'line_name': 'hei',
+            'transition': 'forbidden',
+            'air_wave': 3888.647,
+            'vac_wave': 3889.749,
+            'nbursts_name': 'He I 3889',
+            'rcsed_name': 'HeI3889.0'},
+    3890: {'line_name': 'h_dzita',
+            'transition': 'balmer',
+            'air_wave': 3889.064,
+            'vac_wave': 3890.166,
+            'nbursts_name': 'H8 3890',
+            'rcsed_name': 'H_dzita3890.17'},
+    3971: {'line_name': 'h_epsilon',
+            'transition': 'balmer',
+            'air_wave': 3970.079,
+            'vac_wave': 3971.202,
+            'nbursts_name': 'H epsilon',
+            'rcsed_name': 'H_epsilon3971.20'},
+    4070: {'line_name': 'sii',
+            'transition': 'forbidden',
+            'air_wave': 4068.600,
+            'vac_wave': 4069.749,
+            'nbursts_name': '[S II] 4069',
+            'rcsed_name': 'SII4069.75'},
+    4078: {'line_name': 'sii',
+            'transition': 'forbidden',
+            'air_wave': 4076.349,
+            'vac_wave': 4077.500,
+            'nbursts_name': '[S II] 4077',
+            'rcsed_name': 'SII4077.50'},
+    4103: {'line_name': 'h_delta',
+            'transition': 'balmer',
+            'air_wave': 4101.742,
+            'vac_wave': 4102.900,
+            'nbursts_name': 'H delta',
+            'rcsed_name': 'H_delta4102.89'},
+    4342: {'line_name': 'h_gamma',
+            'transition': 'balmer',
+            'air_wave': 4340.471,
+            'vac_wave': 4341.692,
+            'nbursts_name': 'H gamma',
+            'rcsed_name': 'H_gamma4341.68',
+            'plot_name': r'H$\gamma$'},
+    4364: {'line_name': 'oiii',
+            'transition': 'forbidden',
+            'air_wave': 4363.210,
+            'vac_wave': 4364.437,
+            'nbursts_name': '[O III] 4364',
+            'rcsed_name': 'OIII4364.44'},
+    4687: {'line_name': 'heii',
+            'transition': 'forbidden',
+            'air_wave': 4685.710,
+            'vac_wave': 4687.022,
+            'nbursts_name': 'He II 4687',
+            'rcsed_name': 'HeII4687.07'},
+    4713: {'line_name': 'ariv',
+            'transition': 'forbidden',
+            'air_wave': 4711.260,
+            'vac_wave': 4712.579,
+            'nbursts_name': '[Ar IV] 4712',
+            'rcsed_name': 'ArIV4712.69'},
+    4742: {'line_name': 'ariv',
+            'transition': 'forbidden',
+            'air_wave': 4740.120,
+            'vac_wave': 4741.447,
+            'nbursts_name': '[Ar IV] 4741',
+            'rcsed_name': 'ArIV4741.50'},
+    4863: {'line_name': 'h_beta',
+            'transition': 'balmer',
+            'air_wave': 4861.333,
+            'vac_wave': 4862.692,
+            'nbursts_name': 'H beta',
+            'ppxf_name': 'Hbeta',
+            'rcsed_name': 'H_beta4862.72',
+            'manga_name': 'hb_4862',
+            'plot_name': r'H$\beta$'},
+    4960: {'line_name': 'oiii',
+            'transition': 'forbidden',
+            'air_wave': 4958.911,
+            'vac_wave': 4960.296,
+            'nbursts_name': '[O III] 4960',
+            'rcsed_name': 'OIII4960.30',
+            'manga_name': 'oiii_4960',
+            'plot_name': r'[OIII]4960'},
+    5008: {'line_name': 'oiii',
+            'transition': 'forbidden',
+            'air_wave': 5006.843,
+            'vac_wave': 5008.241,
+            'nbursts_name': '[O III] 5008',
+            'rcsed_name': 'OIII5008.24',
+            'manga_name': 'oiii_5007',
+            'plot_name': r'[OIII]5008'},
+    5199: {'line_name': 'fe ii',
+            'transition': 'forbidden',
+            'air_wave': 5197.577,
+            'vac_wave': 5199.026,
+            'nbursts_name': 'Fe II 5199'},
+    5202: {'line_name': 'ni',
+            'transition': 'forbidden',
+            'air_wave': 5200.257,
+            'vac_wave': 5201.707,
+            'nbursts_name': '[N I] 5201',
+            'rcsed_name': 'NI5199.35'},
+    5756: {'line_name': 'nii',
+            'transition': 'forbidden',
+            'air_wave': 5754.590,
+            'vac_wave': 5756.188,
+            'nbursts_name': '[N II] 5756',
+            'rcsed_name': 'NII5756.19'},
+    5877: {'line_name': 'hei',
+            'transition': 'forbidden',
+            'air_wave': 5875.624,
+            'vac_wave': 5877.255,
+            'nbursts_name': 'He I 5877',
+            'rcsed_name': 'HeI5877.25'},
+    6302: {'line_name': 'oi',
+            'transition': 'forbidden',
+            'air_wave': 6300.304,
+            'vac_wave': 6302.049,
+            'nbursts_name': '[O I] 6302',
+            'rcsed_name': 'OI6302.05',
+            'manga_name': 'oi_6302',
+            'plot_name': r'[OI]6302'},
+    6314: {'line_name': 'siii',
+            'transition': 'forbidden',
+            'air_wave': 6312.060,
+            'vac_wave': 6313.808,
+            'nbursts_name': '[S III] 6313',
+            'plot_name': r'[SIII]6312'},
+    6349: {'line_name': 'si ii',
+            'transition': 'forbidden',
+            'air_wave': 6347.100,
+            'vac_wave': 6348.858,
+            'nbursts_name': 'Si II 6348',
+            'plot_name': r'Si II6312'},
+    6366: {'line_name': 'oi',
+            'transition': 'forbidden',
+            'air_wave': 6363.776,
+            'vac_wave': 6365.538,
+            'nbursts_name': '[O I] 6365',
+            'rcsed_name': 'OI6365.54'},
+    6550: {'line_name': 'nii',
+            'transition': 'forbidden',
+            'air_wave': 6548.050,
+            'vac_wave': 6549.862,
+            'nbursts_name': '[N II] 6549',
+            'rcsed_name': 'NII6549.86',
+            'manga_name': 'nii_6549',
+            'plot_name': r'[NII]6550'},
+    6565: {'line_name': 'h_alpha',
+            'transition': 'balmer',
+            'air_wave': 6562.819,
+            'vac_wave': 6564.635,
+            'nbursts_name': 'H alpha',
+            'rcsed_name': 'H_alpha6564.61',
+            'manga_name': 'ha_6564',
+            'plot_name': r'H$\alpha$'},
+    6585: {'line_name': 'nii',
+            'transition': 'forbidden',
+            'air_wave': 6583.460,
+            'vac_wave': 6585.282,
+            'nbursts_name': '[N II] 6585',
+            'rcsed_name': 'NII6585.27',
+            'manga_name': 'nii_6585',
+            'plot_name': r'[NII]6585'},
+    6680 : {'line_name': 'hei',
+            'transition': 'forbidden',
+            'air_wave': 6678.151,
+            'vac_wave': 6679.995,
+            'plot_name': r'[HeI]6680' },
+    6718: {'line_name': 'sii',
+            'transition': 'forbidden',
+            'air_wave': 6716.440,
+            'vac_wave': 6718.298,
+            'nbursts_name': '[S II] 6718',
+            'rcsed_name': 'SII6718.29',
+            'manga_name': 'sii_6718',
+            'plot_name': r'[SII]6718'},
+    6733: {'line_name': 'sii',
+            'transition': 'forbidden',
+            'air_wave': 6730.810,
+            'vac_wave': 6732.671,
+            'nbursts_name': '[S II] 6732',
+            'rcsed_name': 'SII6732.67',
+            'manga_name': 'sii_6732',
+            'plot_name': r'[SII]6733'}}
 
-
+# theoretical emission line ratios taken from the python package pyneb
+# print(pyneb.Atom('O', 3).getHighDensRatio(wave1=5007, wave2=4959))
+# print(pyneb.Atom('N', 2).getHighDensRatio(wave1=6583, wave2=6548))
+# print(pyneb.Atom('O', 1).getHighDensRatio(wave1=6300, wave2=6363))
+em_ratios = {'6585/6550': 2.958075322302304, '5008/4960': 3.0128111622091343, '6302/6366': 3.09983543609435}

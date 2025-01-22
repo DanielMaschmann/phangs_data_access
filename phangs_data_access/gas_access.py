@@ -20,24 +20,28 @@ class GasAccess:
     Access class to organize data structure of ALMA observations
     """
 
-    def __init__(self, target_name=None):
+    def __init__(self, gas_target_name=None):
         """
 
         Parameters
         ----------
-        target_name : str
+        gas_target_name : str
             Default None. Target name
-        target_name : str
+        gas_target_name : str
             Default None. Target name used for Hs observation
         """
 
         # get target specifications
         # check if the target names are compatible
-        if (target_name not in phangs_info.phangs_alma_galaxy_list) & (target_name is not None):
-            raise AttributeError('The target %s is not in the PHANGS ALMA sample or has not been added to '
-                                 'the current package version' % target_name)
 
-        self.target_name = target_name
+        if gas_target_name is not None:
+            gas_target_name = helper_func.FileTools.target_name_no_directions(target=gas_target_name)
+
+        if (gas_target_name not in phangs_info.phangs_alma_galaxy_list) & (gas_target_name is not None):
+            raise AttributeError('The target %s is not in the PHANGS ALMA sample or has not been added to '
+                                 'the current package version' % gas_target_name)
+
+        self.gas_target_name = gas_target_name
 
         # loaded data dictionaries
         self.alma_data = {}
@@ -67,8 +71,8 @@ class GasAccess:
             raise KeyError('res must be either int with the resolution in pc or native')
 
         file_path = (Path(phangs_access_config.phangs_config_dict['alma_data_path']) /
-                     ('delivery_%s' % phangs_access_config.phangs_config_dict['alma_data_ver']) / self.target_name)
-        file_name = '%s_12m+7m+tp_co21_%sbroad_%s.fits' % (self.target_name, res_str, mom)
+                     ('delivery_%s' % phangs_access_config.phangs_config_dict['alma_data_ver']) / self.gas_target_name)
+        file_name = '%s_12m+7m+tp_co21_%sbroad_%s.fits' % (self.gas_target_name, res_str, mom)
 
         return file_path / file_name
 
@@ -87,7 +91,7 @@ class GasAccess:
 
         file_path = (Path(phangs_access_config.phangs_config_dict['alma_conv_map_data_path']) /
                      phangs_access_config.phangs_config_dict['alma_conv_map_data_ver'])
-        file_name = '%s_alphaCO21_%s.fits' % (self.target_name.upper(), alpha_co_method)
+        file_name = '%s_alphaCO21_%s.fits' % (self.gas_target_name.upper(), alpha_co_method)
 
         return file_path / file_name
 
@@ -182,7 +186,7 @@ class GasAccess:
                      ('%s_%s' % (phangs_access_config.phangs_config_dict['alma_data_ver'],
                                  phangs_access_config.phangs_config_dict['alma_cloud_cat_data_release_ver'])) /
                      ('%s_gmccats' % phangs_access_config.phangs_config_dict['alma_data_ver']) / res_folder)
-        file_name = '%s_12m+7m+tp_co21_%s_props.fits' % (self.target_name, res_str)
+        file_name = '%s_12m+7m+tp_co21_%s_props.fits' % (self.gas_target_name, res_str)
 
         return file_path / file_name
 
@@ -236,8 +240,8 @@ class GasAccess:
         """
         rad_cloud_pc = self. get_cloud_rad_pc(res=res)
         sample_access = SampleAccess()
-        target_dist_mpc = sample_access.get_target_dist(target=self.target_name)
-        central_target_pos = helper_func.CoordTools.get_target_central_simbad_coords(target_name=self.target_name,
+        target_dist_mpc = sample_access.get_target_dist(target=self.gas_target_name)
+        central_target_pos = helper_func.CoordTools.get_target_central_simbad_coords(target_name=self.gas_target_name,
                                                                                      target_dist_mpc=target_dist_mpc)
 
         off_set_central_pos = SkyCoord(ra=central_target_pos.ra + 1*u.arcsec, dec=central_target_pos.dec,
@@ -265,9 +269,9 @@ class GasAccess:
         -------
         coverage_dict : dict
         """
-        # return np.load(self.path2obs_cover_hull / ('%s_alma_obs_hull_dict.npy' % self.target_name),
+        # return np.load(self.path2obs_cover_hull / ('%s_alma_obs_hull_dict.npy' % self.gas_target_name),
         #                allow_pickle=True).item()
-        with open(self.path2obs_cover_hull / ('%s_alma_obs_hull_dict.npy' % self.target_name), 'rb') as file_name:
+        with open(self.path2obs_cover_hull / ('%s_alma_obs_hull_dict.npy' % self.gas_target_name), 'rb') as file_name:
             return pickle.load(file_name)
 
     def check_coords_covered_by_alma(self, ra, dec, res='native', max_dist_dist2hull_arcsec=2):

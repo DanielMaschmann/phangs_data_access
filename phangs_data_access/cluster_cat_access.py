@@ -575,7 +575,13 @@ class ClusterCatAccess:
             ebv_old = np.array([])
 
             if target == 'all':
-                target_list = phangs_info.hst_cluster_cat_target_list
+                if self.phangs_hst_cluster_cat_release == 'phangs_hst_cc_dr4_cr3_ground_based_ha':
+                    target_list = phangs_info.hst_cluster_cat_target_list
+                elif self.phangs_hst_cluster_cat_release == 'phangs_hst_cc_dr4_cr3_hst_ha':
+                    target_list = phangs_info.hst_cluster_cat_hst_ha_target_list
+                else:
+                    raise KeyError('The catalog version is not understood. '
+                                   'especially in order to select which target list?')
             else:
                 target_list = [target]
 
@@ -589,8 +595,8 @@ class ClusterCatAccess:
             for target in target_list:
 
                 for cluster_class in cluster_class_list:
-                    # make sure that data is loaded
-                    self.load_hst_cluster_cat()
+                    # # make sure that data is loaded
+                    # self.load_hst_cluster_cat(target_list=target_list)
                     # make sure that data is loaded
                     self.load_hst_cluster_cat(target_list=target_list, classify_list=[classify],
                                               cluster_class_list=[cluster_class])
@@ -634,11 +640,11 @@ class ClusterCatAccess:
                     else: galaxy_name = target
 
                     phangs_phot = PhotAccess(
-                        target_name=helper_func.FileTools.target_name_no_directions(target=galaxy_name))
+                        phot_target_name=helper_func.FileTools.target_name_no_directions(target=galaxy_name))
                     phangs_gas = GasAccess(
-                        target_name=helper_func.FileTools.target_name_no_directions(target=galaxy_name))
+                        gas_target_name=helper_func.FileTools.target_name_no_directions(target=galaxy_name))
                     phangs_spec = SpecAccess(
-                        target_name=helper_func.FileTools.target_name_no_directions(target=galaxy_name))
+                        spec_target_name=helper_func.FileTools.target_name_no_directions(target=galaxy_name))
                     mask_hst_broad_band_covered = (
                         np.concatenate([mask_hst_broad_band_covered,
                                         phangs_phot.check_coords_covered_by_obs(
@@ -877,6 +883,16 @@ class ClusterCatAccess:
             if save_quick_access:
                 np.save(quick_access_dict_path, quick_access_dict)
             return quick_access_dict
+
+    def get_hst_cc_cross_match_mask(self, target, ra, dec, classify='human', cluster_class='class12',
+                                    toleance_arcsec=0.04, allow_multiple_id=False):
+        ra_hst_cc ,dec_hst_cc = self.get_hst_cc_coords_world(target=target, classify=classify,
+                                                             cluster_class=cluster_class)
+        separation = helper_func.CoordTools.calc_coord_separation(ra_1=ra_hst_cc, dec_1=dec_hst_cc, ra_2=ra, dec_2=dec)
+        cross_match_map = separation < toleance_arcsec*u.arcsec
+        if allow_multiple_id & (sum(cross_match_map) > 1):
+            raise RuntimeError('Multiple obejcts were identified!')
+        return cross_match_map
 
     def load_ccd_hull(self, ccd_type='ubvi', cluster_region='ycl', classify='human'):
         """

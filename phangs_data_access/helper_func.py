@@ -3,6 +3,7 @@ This script gathers function to support the HST catalog release
 """
 
 import os
+from mailbox import FormatError
 from pathlib import Path, PosixPath
 import warnings
 
@@ -13,16 +14,18 @@ import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astropy.stats import SigmaClip
 from astropy.visualization.wcsaxes import SphericalCircle
-from astropy import constants as const
 from astroquery.simbad import Simbad
 
 from pandas import read_csv
 
+from astropy import constants as const
 speed_of_light_kmps = const.c.to('km/s').value
 from scipy.constants import c as speed_of_light_mps
 
 
 from scipy.spatial import ConvexHull
+from scipy import odr
+from scipy.optimize import curve_fit
 
 from shapely.geometry import Point
 from shapely.geometry.polygon import Polygon
@@ -36,7 +39,7 @@ from reproject import reproject_interp
 from astropy.stats import sigma_clipped_stats
 import pandas as pd
 
-# import dust_tools.extinction_tools
+
 
 import numpy as np
 
@@ -158,11 +161,11 @@ class CoordTools:
         # now create a WCS for this histogram
         new_wcs = WCS(naxis=2)
         # what is the center pixel of the XY grid.
-        new_wcs.wcs.crpix = [img_shape[0] / 2, img_shape[1] / 2]
+        new_wcs.wcs.crpix = [img_shape[1] / 2, img_shape[0] / 2]
         # what is the galactic coordinate of that pixel.
         new_wcs.wcs.crval = [ra_center, dec_center]
         # what is the pixel scale in lon, lat.
-        new_wcs.wcs.cdelt = np.array([-ra_image_width / img_shape[0], dec_image_width / img_shape[1]])
+        new_wcs.wcs.cdelt = np.array([-ra_image_width / img_shape[1], dec_image_width / img_shape[0]])
         # you would have to determine if this is in fact a tangential projection.
         new_wcs.wcs.ctype = ["RA---AIR", "DEC--AIR"]
 
@@ -215,7 +218,22 @@ class CoordTools:
         # check if cutout is inside the image
         pix_pos = wcs.world_to_pixel(coord)
         if (pix_pos[0] > 0) & (pix_pos[0] < img.shape[1]) & (pix_pos[1] > 0) & (pix_pos[1] < img.shape[0]):
-            return Cutout2D(data=img, position=coord, size=size, wcs=wcs)
+            if np.ndim(img) == 2:
+                return Cutout2D(data=img, position=coord, size=size, wcs=wcs)
+            elif np.ndim(img) == 3:
+                img_data1 = Cutout2D(data=img[:, :, 0], position=coord, size=size, wcs=wcs)
+                img_data2 = Cutout2D(data=img[:, :, 1], position=coord, size=size, wcs=wcs)
+                img_data3 = Cutout2D(data=img[:, :, 2], position=coord, size=size, wcs=wcs)
+                cutout_data = np.zeros((*img_data1.shape, 3))
+                cutout_data[:,:, 0] = img_data1.data
+                cutout_data[:,:, 1] = img_data2.data
+                cutout_data[:,:, 2] = img_data3.data
+                cut_out = type('', (), {})()
+                cut_out.data = cutout_data
+                cut_out.wcs = img_data1.wcs
+                return cut_out
+            else:
+                raise FormatError('The cutout must have 2 or 3 dimensions. The latter would be a RGB image')
         else:
             warnings.warn("The selected cutout is outside the original dataset. The data and WCS will be None",
                           DeprecationWarning)
@@ -440,6 +458,30 @@ class UnitTools:
         return mag - 25 - 5 * np.log10(dist)
 
     @staticmethod
+    def conv_abs_mag2mag(abs_mag, dist):
+        """
+        conversion following https://en.wikipedia.org/wiki/Absolute_magnitude
+        M = m - 5*log10(d_pc) + 5
+        M = m - 5*log10(d_Mpc * 10^6) + 5
+        M = m - 5*log10(d_Mpc) -5*log10(10^6) + 5
+        M = m - 5*log10(d_Mpc) -25
+
+        Parameters
+        ----------
+        abs_mag : float or array-like
+            absolute magnitude
+        dist : float or array-like
+            distance in Mpc
+
+        Returns
+        -------
+        float or array
+            the observed magnitude
+
+         """
+        return abs_mag + 25 + 5 * np.log10(dist)
+
+    @staticmethod
     def angstrom2unit(wave, unit='mu'):
         """
         Returns wavelength at needed wavelength
@@ -557,6 +599,33 @@ class UnitTools:
 
         # here we must be careful because the flux of the filter is in mJy and the zero point flux is in Jy
         return -2.5 * np.log10(flux*1e-3 / zp_vega_flux)
+
+    @staticmethod
+    def conv_mjy_err2vega_err(flux, flux_err):
+
+
+        return 2.5 * flux_err / (flux * np.log(10))
+
+    @staticmethod
+    def conv_vega2mjy(vega_mag, telescope, instrument, band):
+        """
+        This function converts
+        """
+        if telescope == 'hst':
+            zp_vega_flux = UnitTools.get_hst_vega_zp(instrument=instrument, band=band)
+        elif telescope == 'jwst':
+            zp_vega_flux = UnitTools.get_jwst_vega_zp(instrument=instrument, band=band)
+        elif telescope == 'astrosat':
+            zp_vega_flux = UnitTools.get_astrosat_vega_zp(band=band)
+        else:
+            raise KeyError('telescope musst be hst, jwst or astrosat')
+
+        # here we must be careful because the flux of the filter is in mJy and the zero point flux is in Jy
+
+
+        return (10 ** (vega_mag/(-2.5))) * zp_vega_flux * 1e3
+
+
 
     @staticmethod
     def conv_mjy2vega_old(flux, ab_zp=None, vega_zp=None, target=None, band=None):
@@ -903,6 +972,8 @@ class ObsTools:
             return 'acs'
         elif band in phangs_info.hst_obs_band_dict[target]['uvis']:
             return 'uvis'
+        elif band in phangs_info.hst_obs_band_dict[target]['ir']:
+            return 'ir'
         else:
             print(target, ' has no HST observation for the Band ', band)
             return None
@@ -929,6 +1000,8 @@ class ObsTools:
             return UnitTools.angstrom2unit(wave=phys_params.hst_wfc3_uvis1_bands_wave[band][wave_estimator], unit=unit)
         elif instrument == 'uvis2':
             return UnitTools.angstrom2unit(wave=phys_params.hst_wfc3_uvis2_bands_wave[band][wave_estimator], unit=unit)
+        elif instrument == 'ir':
+            return UnitTools.angstrom2unit(wave=phys_params.hst_wfc3_ir_bands_wave[band][wave_estimator], unit=unit)
         else:
             raise KeyError(instrument, ' is not a HST instrument')
 
@@ -1224,23 +1297,31 @@ class ObsTools:
         """
         Method to get from band-pass filter names to the HST filter names used for this observation.
         """
-        if filter_name == 'NUV':
-            return 'F275W'
-        elif filter_name == 'U':
-            return 'F336W'
+        if filter_name == 'NUV': return 'F275W'
+        elif filter_name == 'U': return 'F336W'
         elif filter_name == 'B':
-            if 'F438W' in phangs_info.hst_cluster_cat_obs_band_dict[target]['uvis']:
-                return 'F438W'
-            else:
-                return 'F435W'
-        elif filter_name == 'V':
-            return 'F555W'
-        elif filter_name == 'I':
-            return 'F814W'
-        elif filter_name == 'Ha':
-            return ObsTools.get_hst_ha_band(target=target)
+            if 'F438W' in phangs_info.hst_cluster_cat_obs_band_dict[target]['uvis']: return 'F438W'
+            else: return 'F435W'
+        elif filter_name == 'V': return 'F555W'
+        elif filter_name == 'I': return 'F814W'
+        elif filter_name == 'Ha': return ObsTools.get_hst_ha_band(target=target)
         else:
             raise KeyError(filter_name, ' is not available ')
+
+    @staticmethod
+    def hst_band2filter_name(band, latex=True):
+        """
+        Method to get from HST filter names used for this observation to the band pass name.
+        """
+        if band == 'F275W': return 'NUV'
+        elif band == 'F336W': return 'U'
+        elif (band == 'F438W') | (band == 'F435W'): return 'B'
+        elif band == 'F555W': return 'V'
+        elif band == 'F814W': return 'I'
+        elif (band == 'F657N') | (band == 'F658N'):
+            if latex: return r'H$\alpha$'
+            else: return 'Ha'
+        else: raise KeyError(band, ' is not available ')
 
 
 class GeometryTools:
@@ -1275,6 +1356,10 @@ class GeometryTools:
         # compute contours
         contours = dummy_ax.contour(data_array, levels=level, colors='red')
         # get the path collection of one specific contour level
+        # print(contours.allsegs)
+        # print(contours.allsegs[0])
+        # print(contours.allsegs[0][0])
+        # exit()
         contour_collection = contours.allsegs[contour_index]
         # get rid of the dummy figure
         plt.close(dummy_fig)
@@ -1361,6 +1446,28 @@ class GeometryTools:
             min_dist2point_ensemble[index] = min(dist2point_ensemble)
         return min_dist2point_ensemble > max_dist2ensemble
 
+    @staticmethod
+    def select_img_pix_along_line(data, x_pos, y_pos, angle):
+
+
+        x_pixels = np.arange(data.shape[1])
+        y_pixels = np.arange(data.shape[0])
+        x_mesh, y_mesh = np.meshgrid(x_pixels, y_pixels)
+
+        slope = np.tan(angle*np.pi/180)
+        intercept = y_pos - slope * x_pos
+         # check if slope is 0 or 90 degree
+        if angle == 0:
+            return (y_mesh == np.rint(y_pos - 0.5)) | (y_mesh == np.rint(y_pos + 0.5))
+        elif angle == 90:
+            return (x_mesh == np.rint(x_pos - 0.5)) | (x_mesh == np.rint(x_pos + 0.5))
+        else:
+            y_values_1 = x_mesh * slope + intercept - 0.5
+            y_values_2 = x_mesh * slope + intercept + 0.5
+            x_values_1 = (y_mesh - intercept - 0.5) / slope
+            x_values_2 = (y_mesh - intercept + 0.5) / slope
+            return (y_mesh == np.rint(y_values_1)) | (y_mesh == np.rint(y_values_2)) | (x_mesh == np.rint(x_values_1)) | (x_mesh == np.rint(x_values_2))
+
 
 class SpecHelper:
     def __init__(self):
@@ -1375,6 +1482,89 @@ class SpecHelper:
         return data_identifier
 
 
+class FitTools:
+    @staticmethod
+    def lin_func(p, x):
+        gradient, intersect = p
+        return gradient * x + intersect
+
+    @staticmethod
+    def gaussian_func(x_data, amp, mu, sig):
+        return amp * np.exp(-(x_data - mu) ** 2 / (2 * sig ** 2))
+
+    @staticmethod
+    def fit_line(x_data, y_data, x_data_err, y_data_err):
+        # Create a model for fitting.
+        lin_model = odr.Model(FitTools.lin_func)
+
+        # Create a RealData object using our initiated data from above.
+        data = odr.RealData(x_data, y_data, sx=x_data_err, sy=y_data_err)
+
+        # Set up ODR with the model and data.
+        odr_object = odr.ODR(data, lin_model, beta0=[0., 1.])
+
+        # Run the regression.
+        out = odr_object.run()
+
+        # Use the in-built pprint method to give us results.
+        # out.pprint()
+
+        gradient, intersect = out.beta
+        gradient_err, intersect_err = out.sd_beta
+
+        # calculate sigma around fit
+        sigma = np.std(y_data - FitTools.lin_func(p=(gradient, intersect), x=x_data))
+
+        return {
+            'gradient': gradient,
+            'intersect': intersect,
+            'gradient_err': gradient_err,
+            'intersect_err': intersect_err,
+            'sigma': sigma
+        }
+
+    @staticmethod
+    def fit_gauss_old(x_data, y_data, x_data_err, y_data_err, amp_guess=1, mu_guess=0, sig_guess=1):
+        # Create a model for fitting.
+        gauss_model = odr.Model(FitTools.gaussian_func)
+
+        # Create a RealData object using our initiated data from above.
+        data = odr.RealData(x_data, y_data, sx=x_data_err, sy=y_data_err)
+
+        # Set up ODR with the model and data.
+        odr_object = odr.ODR(data, gauss_model, beta0=[amp_guess, mu_guess, sig_guess])
+
+        # Run the regression.
+        out = odr_object.run()
+        amp, mu, sig = out.beta
+        amp_err, mu_err, sig_err = out.sd_beta
+
+        return {'amp': amp, 'mu': mu, 'sig': sig, 'amp_err': amp_err, 'mu_err': mu_err, 'sig_err': sig_err}
+
+    @staticmethod
+    def fit_gauss(x_data, y_data, y_data_err=None,
+                  amp_guess=1, mu_guess=0, sig_guess=1,
+                  lower_amp=np.inf*-1, upper_amp=np.inf,
+                  lower_mu=np.inf*-1, upper_mu=np.inf,
+                  lower_sigma=0, upper_sigma=np.inf
+                  ):
+
+
+
+        initial_guess = [amp_guess, mu_guess, sig_guess]
+        bounds = ([lower_amp, lower_mu, lower_sigma], [upper_amp, upper_mu, upper_sigma])  # (lower bounds, upper bounds)
+        popt, pcov = curve_fit(f=FitTools.gaussian_func, xdata=x_data, ydata=y_data, sigma=y_data_err,
+                               p0=initial_guess, bounds=bounds, nan_policy='omit')
+
+        perr = np.sqrt(np.diag(pcov))
+
+        amp, mu, sig = popt
+        amp_err, mu_err, sig_err = perr
+
+        # print(amp, mu, sig)
+
+
+        return {'amp': amp, 'mu': mu, 'sig': sig, 'amp_err': amp_err, 'mu_err': mu_err, 'sig_err': sig_err}
 
 
 def load_muse_cube(muse_cube_path):
@@ -1620,68 +1810,6 @@ def fit_ppxf2spec(spec_dict, redshift, sps_name='fsps', age_range=None, metal_ra
     # exit()
 
 
-
-
-def compute_cbar_norm(vmin_vmax=None, cutout_list=None, log_scale=False):
-    """
-    Computing the color bar scale for a single or multiple cutouts.
-
-    Parameters
-    ----------
-    vmin_vmax : tuple
-    cutout_list : list
-        This list should include all cutouts
-    log_scale : bool
-
-    Returns
-    -------
-    norm : ``matplotlib.colors.Normalize``  or ``matplotlib.colors.LogNorm``
-    """
-    if (vmin_vmax is None) & (cutout_list is None):
-        raise KeyError('either vmin_vmax or cutout_list must be not None')
-
-    # get maximal value
-    # vmin_vmax
-
-    if vmin_vmax is None:
-        vmin = None
-        vmax = None
-        for cutout in cutout_list:
-            sigma_clip = SigmaClip(sigma=3)
-            mask_zeros = np.invert(cutout == 0)
-            if len(sigma_clip(cutout[mask_zeros])) == 0:
-                return None
-            min = np.nanmin(sigma_clip(cutout[mask_zeros]))
-            max = np.nanmax(sigma_clip(cutout[mask_zeros]))
-            if vmin is None:
-                vmin = min
-            if vmax is None:
-                vmax = max
-            if min < vmin:
-                vmin = min
-            if max > vmax:
-                vmax = max
-
-        # list_of_means = [np.nanmean(cutout) for cutout in cutout_list]
-        # list_of_stds = [np.nanstd(cutout) for cutout in cutout_list]
-        # mean, std = (np.nanmean(list_of_means), np.nanstd(list_of_stds))
-        #
-        # vmin = mean - 5 * std
-        # vmax = mean + 20 * std
-
-
-    else:
-        vmin, vmax = vmin_vmax[0], vmin_vmax[1]
-    if log_scale:
-
-        if vmax < 0:
-            vmax = 0.000001
-        if vmin < 0:
-            vmin = vmax / 100
-        norm = LogNorm(vmin, vmax)
-    else:
-        norm = Normalize(vmin, vmax)
-    return norm
 
 
 

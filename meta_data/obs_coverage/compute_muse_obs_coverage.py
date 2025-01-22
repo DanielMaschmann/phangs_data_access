@@ -20,7 +20,7 @@ for target in target_list:
     #     continue
 
     # now get muse bands
-    phangs_spec = spec_access.SpecAccess(target_name=target)
+    phangs_spec = spec_access.SpecAccess(spec_target_name=target)
 
     print(target)
 

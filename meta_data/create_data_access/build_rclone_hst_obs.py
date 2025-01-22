@@ -59,19 +59,19 @@ for target in target_list:
             hst_rclone_file.writelines(path_str + wht_path + ' ' + destination_str + 'uvis' + band.lower() + ' \n')
 
     for band in phangs_info.hst_obs_band_dict[target]['acs_uvis']:
-        print('UVIS ', band)
-        data_path = ('uvis' + band.lower() + '/' + '%s_acs_uvis_%s_exp_drc_sci.fits' %
+        print('ACS and UVIS ', band)
+        data_path = (band.lower() + '/' + '%s_acsuvis_%s_exp_drc_sci.fits' %
                      (helper_func.FileTools.target_names_no_zeros(target=target), band.lower()))
-        err_path = ('uvis' + band.lower() + '/' + '%s_acs_uvis_%s_err_drc_wht.fits' %
+        err_path = (band.lower() + '/' + '%s_acsuvis_%s_err_drc_wht.fits' %
                     (helper_func.FileTools.target_names_no_zeros(target=target), band.lower()))
-        wht_path = ('uvis' + band.lower() + '/' + '%s_acs_uvis_%s_exp_drc_wht.fits' %
+        wht_path = (band.lower() + '/' + '%s_acsuvis_%s_exp_drc_wht.fits' %
                     (helper_func.FileTools.target_names_no_zeros(target=target), band.lower()))
         if not os.path.isfile(check_destination_str + data_path):
-            hst_rclone_file.writelines(path_str + data_path + ' ' + destination_str + 'uvis' + band.lower() + ' \n')
+            hst_rclone_file.writelines(path_str + data_path + ' ' + destination_str + 'acs_uvis' + band.lower() + ' \n')
         if not os.path.isfile(check_destination_str + err_path):
-            hst_rclone_file.writelines(path_str + err_path + ' ' + destination_str + 'uvis' + band.lower() + ' \n')
+            hst_rclone_file.writelines(path_str + err_path + ' ' + destination_str + 'acs_uvis' + band.lower() + ' \n')
         if not os.path.isfile(check_destination_str + wht_path):
-            hst_rclone_file.writelines(path_str + wht_path + ' ' + destination_str + 'uvis' + band.lower() + ' \n')
+            hst_rclone_file.writelines(path_str + wht_path + ' ' + destination_str + 'acs_uvis' + band.lower() + ' \n')
 
 hst_rclone_file.close()
 

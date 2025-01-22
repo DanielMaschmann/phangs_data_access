@@ -30,16 +30,18 @@ class SpecAccess:
     Access class to organize all kind of spectroscopic data available
     """
 
-    def __init__(self, target_name=None):
+    def __init__(self, spec_target_name=None):
         """
 
         Parameters
         ----------
-        target_name : str
+        spec_target_name : str
             Default None. Target name
         """
+        if spec_target_name is not None:
+            spec_target_name = helper_func.FileTools.target_name_no_directions(target=spec_target_name)
 
-        self.target_name = target_name
+        self.spec_target_name = spec_target_name
 
         # loaded data dictionaries
         self.muse_dap_map_data = {}
@@ -75,26 +77,26 @@ class SpecAccess:
         # get file name
         if data_prod == 'MUSEDAP':
             if res == 'copt':
-                file_name = '%s-%.2fasec_MAPS.fits' % (self.target_name.upper(),
-                                                       phangs_info.muse_obs_res_dict[self.target_name]['copt_res'])
+                file_name = '%s-%.2fasec_MAPS.fits' % (self.spec_target_name.upper(),
+                                                       phangs_info.muse_obs_res_dict[self.spec_target_name]['copt_res'])
             elif res == 'native':
-                file_name = '%s_MAPS.fits' % self.target_name.upper()
+                file_name = '%s_MAPS.fits' % self.spec_target_name.upper()
             elif res == '150pc':
-                file_name = '%s-150pc_MAPS.fits' % self.target_name.upper()
+                file_name = '%s-150pc_MAPS.fits' % self.spec_target_name.upper()
             elif res == '15asec':
-                file_name = '%s-15asec_MAPS.fits' % self.target_name.upper()
+                file_name = '%s-15asec_MAPS.fits' % self.spec_target_name.upper()
             else:
                 raise KeyError(res, ' must be copt, native, 150pc or 15asec')
         elif data_prod == 'datacubes':
             if res == 'copt':
-                file_name = '%s-%.2fasec.fits' % (self.target_name.upper(),
-                                                       phangs_info.muse_obs_res_dict[self.target_name]['copt_res'])
+                file_name = '%s-%.2fasec.fits' % (self.spec_target_name.upper(),
+                                                       phangs_info.muse_obs_res_dict[self.spec_target_name]['copt_res'])
             elif res == 'native':
-                file_name = '%s.fits' % self.target_name.upper()
+                file_name = '%s.fits' % self.spec_target_name.upper()
             elif res == '150pc':
-                file_name = '%s-150pc.fits' % self.target_name.upper()
+                file_name = '%s-150pc.fits' % self.spec_target_name.upper()
             elif res == '15asec':
-                file_name = '%s-15asec.fits' % self.target_name.upper()
+                file_name = '%s-15asec.fits' % self.spec_target_name.upper()
             else:
                 raise KeyError(res, ' must be copt, native, 150pc or 15asec')
         else:
@@ -200,9 +202,9 @@ class SpecAccess:
         -------
         coverage_mask : dict
         """
-        # return np.load(self.path2obs_cover_hull / ('%s_muse_obs_hull_dict.npy' % self.target_name),
+        # return np.load(self.path2obs_cover_hull / ('%s_muse_obs_hull_dict.npy' % self.spec_target_name),
         #                allow_pickle=True).item()
-        with open(self.path2obs_cover_hull / ('%s_muse_obs_hull_dict.npy' % self.target_name), 'rb') as file_name:
+        with open(self.path2obs_cover_hull / ('%s_muse_obs_hull_dict.npy' % self.spec_target_name), 'rb') as file_name:
             return pickle.load(file_name)
 
     def check_coords_covered_by_muse(self, ra, dec, res='copt', max_dist_dist2hull_arcsec=2):
@@ -220,6 +222,10 @@ class SpecAccess:
         -------
         coverage_dict : ``np.ndarray``
         """
+
+        if isinstance(ra, float):
+            ra = [ra]
+            dec = [dec]
 
         band_hull_dict = self.get_muse_obs_coverage_hull_dict()[res]
         coverage_mask = np.zeros(len(ra), dtype=bool)

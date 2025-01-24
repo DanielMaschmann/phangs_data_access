@@ -9,7 +9,6 @@ import pickle
 
 from photutils import aperture_photometry
 from photutils import CircularAperture, CircularAnnulus
-from photutils import detect_sources, detect_threshold
 from photutils.profiles import RadialProfile, CurveOfGrowth
 from photutils.aperture import SkyCircularAperture, SkyCircularAnnulus, CircularAnnulus, CircularAperture
 from photutils.aperture import ApertureStats
@@ -23,6 +22,8 @@ from astropy import constants as const
 speed_of_light_kmps = const.c.to('km/s').value
 from astropy.stats import SigmaClip
 from astropy.stats import sigma_clipped_stats
+
+from scipy.interpolate import interp1d
 
 # owen packages
 from phangs_data_access import phys_params, helper_func, phangs_info
@@ -376,13 +377,25 @@ class ProfileTools:
             mask = np.zeros(data.shape, dtype=bool)
 
         profile_mask = mask[mask_pixels_in_slit]
-
         profile_data = data[mask_pixels_in_slit]
         radius_data = radial_map[mask_pixels_in_slit]
+
+        # print(profile_mask)
+        # import matplotlib.pyplot as plt
+        #
+        # plt.imshow(np.array(mask_pixels_in_slit, dtype=int))
+        # plt.show()
+        #
+        # plt.imshow(np.array(mask, dtype=int))
+        # plt.show()
+
+
         # sort for radius
         sort = np.argsort(radius_data)
         profile_data = profile_data[sort]
         radius_data = radius_data[sort]
+        profile_mask = profile_mask[sort]
+
 
         if err is not None:
             profile_err = err[mask_pixels_in_slit]
@@ -449,17 +462,36 @@ class ProfileTools:
 
         # get profiles along a slit
         slit_profile_dict = ProfileTools.compute_axis_profiles_from_img(
-            img=img, wcs=wcs, ra=ra, dec=dec, max_rad_arcsec=max_rad_arcsec, n_slits=n_slits, err=img_err)
+            img=img, wcs=wcs, ra=ra, dec=dec, max_rad_arcsec=max_rad_arcsec, n_slits=n_slits, err=img_err,
+            mask=img_mask)
 
         return {'rad': rad, 'profile': profile, 'profile_err': profile_err, 'slit_profile_dict': slit_profile_dict}
 
     @staticmethod
-    def measure_morph_photometry(rad_profile_dict, std_pix, upper_sig_fact=10, central_rad_fact=3, model_pos_rad_accept_fact=1):
+    def get_psf_gauss_corr_fact(band, instrument, std):
+        # load the EE dict
+        if instrument == 'miri':
+            ee_corr_file_name = Path(__file__).parent.parent.resolve() / 'meta_data' / 'psf_data' / 'data_output'/ 'miri_psf_correction_dict.pickle'
+
+        # psf_correction_dict = pickle.load(ee_corr_file_name)
+        with open(ee_corr_file_name, 'rb') as file_name:
+            psf_correction_dict = pickle.load(file_name)
+
+        if std < psf_correction_dict[band]['measured_std_values'][0]:
+            return psf_correction_dict[band]['measured_ee_value'][0]
+        elif std > psf_correction_dict[band]['measured_std_values'][-1]:
+            return psf_correction_dict[band]['measured_ee_value'][-1]
+
+        # interpolate the
+        interp_func = interp1d(psf_correction_dict[band]['measured_std_values'], psf_correction_dict[band]['measured_ee_value'])
+        return interp_func(std)
+
+    @staticmethod
+    def measure_morph_photometry(topo_dict, band, instrument, x_center, ycenter, rad_profile_dict, std_pix,
+                                 upper_sig_fact=10, central_rad_fact=3, model_pos_rad_accept_fact=1,
+                                 n_good_fits_needed=4):
 
         radius_of_interes = float(std_pix * central_rad_fact)
-
-        # central_apert_stats_source = ApertTools.get_circ_apert_stats(
-        #     data=data, data_err=data_err, x_pos=x_pos, y_pos=y_pos, aperture_rad=radius_of_interes)
 
         amp_list = []
         mu_list = []
@@ -474,20 +506,16 @@ class ProfileTools:
 
 
         for idx in rad_profile_dict['list_angle_idx']:
-            print(rad_profile_dict[str(idx)]['profile_mask'])
-            import matplotlib.pyplot as plt
-            plt.plot(rad_profile_dict[str(idx)]['radius_data'], rad_profile_dict[str(idx)]['profile_data'])
-            plt.show()
+
+            # plt.plot(rad_profile_dict[str(idx)]['radius_data'], rad_profile_dict[str(idx)]['profile_data'])
+            # plt.show()
+
             mask_pixels_to_fit = ((rad_profile_dict[str(idx)]['radius_data'] > radius_of_interes * -1) &
                            (rad_profile_dict[str(idx)]['radius_data'] < radius_of_interes) & np.invert(rad_profile_dict[str(idx)]['profile_mask']))
-
-
             min_value_in_center = np.min(rad_profile_dict[str(idx)]['profile_data'][mask_pixels_to_fit])
             max_value_in_center = np.max(rad_profile_dict[str(idx)]['profile_data'][mask_pixels_to_fit])
-
             lower_amp = min_value_in_center
             upper_amp = max_value_in_center + np.abs(max_value_in_center * 2)
-
             # update the maximal amplitude value
             if max_value_in_center > max_amp_value:
                 max_amp_value = max_value_in_center
@@ -509,7 +537,7 @@ class ProfileTools:
             # plt.show()
 
             # select the lower amplitude. There is a chance that the values are negative
-
+            #
             # plt.plot(rad_profile_dict[str(idx)]['radius_data'],
             #              rad_profile_dict[str(idx)]['profile_data'],
             #              color='gray')
@@ -524,13 +552,18 @@ class ProfileTools:
                 lower_mu=std_pix * -5, upper_mu=std_pix * 5,
                 lower_sigma=std_pix, upper_sigma=std_pix * upper_sig_fact)
 
-            # dummy_rad = np.linspace(np.min(rad_profile_dict[str(idx)]['radius_data']),
-            #                         np.max(rad_profile_dict[str(idx)]['radius_data']), 500)
-            # gauss = helper_func.FitTools.gaussian_func(
-            #     amp=gaussian_fit_dict['amp'], mu=gaussian_fit_dict['mu'], sig=gaussian_fit_dict['sig'], x_data=dummy_rad)
+            plt.scatter(rad_profile_dict['list_angles'][idx], gaussian_fit_dict['sig'])
+
+
+            # if (gaussian_fit_dict['amp'] > 0) & (np.abs(gaussian_fit_dict['mu']) < std_pix * model_pos_rad_accept_fact):
             #
-            # ax[idx].plot(dummy_rad, gauss)
-            # plt.plot(dummy_rad, gauss)
+            #     dummy_rad = np.linspace(np.min(rad_profile_dict[str(idx)]['radius_data']),
+            #                             np.max(rad_profile_dict[str(idx)]['radius_data']), 500)
+            #     gauss = helper_func.FitTools.gaussian_func(
+            #         amp=gaussian_fit_dict['amp'], mu=gaussian_fit_dict['mu'], sig=gaussian_fit_dict['sig'], x_data=dummy_rad)
+            #
+            #     ax[idx].plot(dummy_rad, gauss)
+            #     plt.plot(dummy_rad, gauss)
             # plt.show()
 
             # get the fit results
@@ -549,7 +582,6 @@ class ProfileTools:
         mu_list = np.array(mu_list)
         sig_list = np.array(sig_list)
         amp_err_list = np.array(amp_err_list)
-        mu_err_list = np.array(mu_err_list)
         sig_err_list = np.array(sig_err_list)
 
         # get all the gaussian functions that make sense
@@ -558,50 +590,103 @@ class ProfileTools:
         # they must have a positive amplitude
         mask_amp = (amp_list > 0)
 
+        # plot all the good functions
+
         # if no function was detected in the center
         if sum(mask_mu * mask_amp) == 0:
-            # non detection
-            mean_amp = central_apert_stats_source.max
-            mean_mu = 0
-            mean_sig = std_pix
+            # none detection
+            # compute the maximal flux inside the 1 sigma PSF environment
+            src_region_stats = ApertTools.get_circ_apert_stats(
+                data=topo_dict['img'], data_err=None, x_pos=x_center, y_pos=ycenter,
+                aperture_rad=topo_dict['psf_std_pix'])
+
+            amp = src_region_stats.max
+            mu = 0
+            sig = topo_dict['psf_std_pix']
             # get flux inside the 3 sigma aperture
-            flux = central_apert_stats_source.sum
-            # flux_err = np.sqrt(central_apert_stats_source.sum_err ** 2 + central_apert_stats_bkg.sum_err ** 2)
-            flux_err = np.sqrt(central_apert_stats_source.sum_err ** 2)
+            flux = amp * 2 * np.pi * (sig ** 2)
+            flux_err = flux
             detect_flag = False
+            good_fit_flag = False
+            n_successful_fits = 0
+
         else:
-            # print(sum(mask_mu * mask_amp))
-            # print(amp_list[mask_mu * mask_amp])
-            # print(mu_list[mask_mu * mask_amp])
-            # print(sig_list[mask_mu * mask_amp])
 
-            mean_amp = np.mean(amp_list[mask_mu * mask_amp])
-            mean_mu = np.mean(mu_list[mask_mu * mask_amp])
-            mean_sig = np.mean(sig_list[mask_mu * mask_amp])
+            amp = np.mean(amp_list[mask_mu * mask_amp])
+            mu = np.mean(mu_list[mask_mu * mask_amp])
+            # if sum(mask_mu * mask_amp) == 1:
+            #     # mean_amp =
+            #     sig_1 = np.mean(sig_list[mask_mu * mask_amp])
+            #     sig_2 = np.mean(sig_list[mask_mu * mask_amp])
+            # else:
+            #     sig_1 = np.min(sig_list[mask_mu * mask_amp])
+            #     sig_2 = np.max(sig_list[mask_mu * mask_amp])
 
-            mean_amp_err = np.mean(amp_err_list[mask_mu * mask_amp])
-            mean_sig_err = np.mean(sig_err_list[mask_mu * mask_amp])
+            sig = np.mean(sig_list[mask_mu * mask_amp])
 
             # get gaussian integaral as flux
-            flux = mean_amp * 2 * np.pi * (mean_sig ** 2)
-            flux_err = np.sqrt(mean_amp_err ** 2 * (2 * mean_sig_err) ** 2)
-            # flux_err = np.sqrt(flux_err ** 2 + central_apert_stats_bkg.sum_err ** 2)
-            detect_flag = True
+            array_flux = amp_list[mask_mu * mask_amp] * 2 * np.pi * (sig_list[mask_mu * mask_amp] ** 2)
+            array_flux_err = array_flux * np.sqrt(
+                (amp_err_list[mask_mu * mask_amp] / amp_list[mask_mu * mask_amp]) ** 2 +
+                (2 * sig_err_list[mask_mu * mask_amp] / sig_list[mask_mu * mask_amp]) ** 2)
+            # calculate the flux as the average flux of all fits
+            flux = np.mean(array_flux)
 
+            # std_flux = np.std(array_flux)
+            std_flux = 0
+            # add together all uncertainties
+            total_fit_err = np.sqrt(np.sum(array_flux_err ** 2)) / sum(mask_mu * mask_amp)
+
+            # now get the uncertainties from the background
+            bkg_rms_region_stats = ApertTools.get_circ_apert_stats(data=topo_dict['bkg_rms'], data_err=None,
+                                                                   x_pos=x_center, y_pos=ycenter, aperture_rad=sig * 3)
+            bkg_err = bkg_rms_region_stats.sum
+            # print('total_fit_err ', total_fit_err)
+            # print('bkg_err ', bkg_err)
+            # print(np.std(array_flux))
+
+            # flux_err = np.sqrt(std_flux ** 2 + total_fit_err ** 2 + bkg_err ** 2)
+            flux_err = total_fit_err
+
+            if sum(mask_mu * mask_amp) < n_good_fits_needed:
+                good_fit_flag = False
+            else:
+                good_fit_flag = True
+
+            if flux < 3 * flux_err:
+                detect_flag = False
+            else:
+                detect_flag = True
+
+            n_successful_fits = sum(mask_mu * mask_amp)
+
+        # get correction factors
+        sig_parcsec = helper_func.CoordTools.transform_pix2world_scale(length_in_pix=sig, wcs=topo_dict['wcs'])
+        # print(detect_flag, good_fit_flag, n_successful_fits)
+        # print(sig_parcsec, topo_dict['psf_std'])
+
+        # correct for PSF size and gaussian approximation
+        flux_corr_fact = ProfileTools.get_psf_gauss_corr_fact(band=band, instrument=instrument, std=sig_parcsec)
+        flux /= flux_corr_fact
+        flux_err /= flux_corr_fact
+
+        # compute a summy gaussian
         dummy_rad = np.linspace(np.min(rad_profile_dict[str(idx)]['radius_data']),
                                 np.max(rad_profile_dict[str(idx)]['radius_data']), 500)
         gauss = helper_func.FitTools.gaussian_func(
-            amp=mean_amp, mu=mean_mu, sig=mean_sig, x_data=dummy_rad)
+            amp=amp, mu=mu, sig=sig, x_data=dummy_rad)
 
         photometry_dict = {
             'dummy_rad': dummy_rad,
             'gauss': gauss,
-            'mean_amp': mean_amp,
-            'mean_mu': mean_mu,
-            'mean_sig': mean_sig,
+            'amp': amp,
+            'mu': mu,
+            'sig': sig,
             'flux': flux,
             'flux_err': flux_err,
-            'detect_flag': detect_flag
+            'detect_flag': detect_flag,
+            'good_fit_flag': good_fit_flag,
+            'n_successful_fits': n_successful_fits
         }
         return photometry_dict
 
@@ -1361,19 +1446,14 @@ class SrcTools:
         init_pos = SkyCoord(ra=init_ra*u.deg, dec=init_dec*u.deg)
         init_pos_pix = wcs.world_to_pixel(init_pos)
         # check if position is masked
-        print(mask.shape)
+        pos_flag = helper_func.GeometryTools.get_2d_array_value_from_pix_coords(array=mask, x_pos=init_pos_pix[0],
+                                                                                y_pos=init_pos_pix[1])
 
-        print(sum(mask))
-        # exit()
-        print(np.rint(init_pos_pix[1]), np.rint(init_pos_pix[0]))
-        pos_flag = mask[int(np.rint(init_pos_pix[1])), int(np.rint(init_pos_pix[0]))]
-        print(pos_flag)
-        exit()
         if src_dict['ra_src']:
             pos_src = SkyCoord(ra=src_dict['ra_src']*u.deg, dec=src_dict['dec_src']*u.deg)
             separation = pos_src.separation(init_pos)
             mask_src_inside_psf_fwhm = separation < re_center_rad_arcsec * u.arcsec
-            if sum(mask_src_inside_psf_fwhm) == 0:
+            if (sum(mask_src_inside_psf_fwhm) == 0) | pos_flag:
                 ra_src_recenter, dec_src_recenter = init_ra, init_dec
                 x_src_recenter, y_src_recenter = init_pos_pix
             else:

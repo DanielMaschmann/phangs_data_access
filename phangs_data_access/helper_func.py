@@ -38,9 +38,6 @@ from reproject import reproject_interp
 
 from astropy.stats import sigma_clipped_stats
 import pandas as pd
-
-
-
 import numpy as np
 
 from phangs_data_access import phys_params, phangs_info, sample_access
@@ -1468,6 +1465,14 @@ class GeometryTools:
             x_values_2 = (y_mesh - intercept + 0.5) / slope
             return (y_mesh == np.rint(y_values_1)) | (y_mesh == np.rint(y_values_2)) | (x_mesh == np.rint(x_values_1)) | (x_mesh == np.rint(x_values_2))
 
+    @staticmethod
+    def get_2d_array_value_from_pix_coords(array, x_pos, y_pos):
+        # it is important to know that an array is organized in rows first and then columns.
+        # Thus, when selecting a value of an 2D array from coordinates it is important to know that this appears
+        # flipped.
+        return array[int(np.rint(y_pos)), int(np.rint(x_pos))]
+
+
 
 class SpecHelper:
     def __init__(self):
@@ -1565,6 +1570,14 @@ class FitTools:
 
 
         return {'amp': amp, 'mu': mu, 'sig': sig, 'amp_err': amp_err, 'mu_err': mu_err, 'sig_err': sig_err}
+
+
+
+
+
+
+
+
 
 
 def load_muse_cube(muse_cube_path):

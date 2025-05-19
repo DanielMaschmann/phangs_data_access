@@ -527,6 +527,23 @@ class FitModels:
                 fit_result_dict.update({'amp_bl_%i_gauss_%i_err' % (line, bl_gauss_index):
                                            minimizer.errors['amp_bl_%i_gauss_%i' % (line, bl_gauss_index)]})
 
+                # get fluxes
+                inst_broad = self.dict_inst_broad[line] / (speed_of_light_mps * 1e-3) * phys_params.opt_line_wave[line][
+                    'vac_wave']
+                sig = (fit_result_dict['sig_bl_gauss_%i' % bl_gauss_index] / (speed_of_light_mps * 1e-3) *
+                       phys_params.opt_line_wave[line]['vac_wave'])
+                sig_conv = np.sqrt(sig ** 2 + inst_broad ** 2)
+                sig_err = (fit_result_dict['sig_bl_gauss_%i_err' % bl_gauss_index] / (speed_of_light_mps * 1e-3) *
+                           phys_params.opt_line_wave[line]['vac_wave'])
+                flux = fit_result_dict['amp_bl_%i_gauss_%i' % (line, bl_gauss_index)] * sig_conv * np.sqrt(2 * np.pi)
+                flux_err = (np.sqrt(2 * np.pi) *
+                            np.sqrt((sig_err * fit_result_dict['amp_bl_%i_gauss_%i' % (line, bl_gauss_index)]) ** 2 +
+                                    (fit_result_dict['amp_bl_%i_gauss_%i_err' % (line, bl_gauss_index)] * sig_conv) ** 2))
+                fit_result_dict.update({'flux_bl_%i_gauss_%i' % (line, bl_gauss_index): flux})
+                fit_result_dict.update({'flux_bl_%i_gauss_%i_err' % (line, bl_gauss_index): flux_err})
+
+
+
         return fit_result_dict
 
     def run_fit(self, fit_param_restrict_dict_nl_gauss,

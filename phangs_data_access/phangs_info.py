@@ -29,6 +29,10 @@ phangs_muse_galaxy_list = [
     'ngc2835', 'ngc3351', 'ngc3627', 'ngc4254', 'ngc4303', 'ngc4321', 'ngc4535', 'ngc5068', 'ngc7496'
 ]
 
+phangs_kcwi_galaxy_list = [
+    'ngc0628', 'ngc1087', 'ngc1300', 'ngc1385', 'ngc2835', 'ngc3239', 'ngc5068'
+]
+
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 # !!!!!!! TO DO: make cluster catalog list version depending !!!!!!!
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

@@ -13,19 +13,30 @@ import pickle
 
 nircam_band_list = phys_params.nircam_bands
 miri_band_list = phys_params.miri_bands
-super_sample_factor_nircam = 4
-super_sample_factor_miri = 4
+super_sample_factor_nircam = 5
+super_sample_factor_miri = 5
+psf_scaling_size = 60
+
 
 psf_dict_jwst_nircam = {}
 for band in nircam_band_list:
     if band in ['F150W2', 'F322W2']:
         continue
+
     nrc = webbpsf.NIRCam()
     nrc.filter = band
-    psf = nrc.calc_psf(oversample=super_sample_factor_nircam,
-                       #fov_pixels=601
-                       fov_arcsec=15)
 
+    empirical_fwhm_pix = phys_params.nircam_empirical_fwhm[band]['fwhm_pix']
+    # compute fov pixel size
+    fov_pixels = np.rint(empirical_fwhm_pix * psf_scaling_size)
+    # make sure the number is odd
+    if fov_pixels % 2 == 0:
+        fov_pixels += 1
+    # compute psf
+    psf = nrc.calc_psf(oversample=super_sample_factor_nircam,
+                            fov_pixels=fov_pixels)
+    print('shape over sampeled ', psf[2].data.shape)
+    print('shape native scale ', psf[3].data.shape)
     pixel_scale = psf[3].header['PIXELSCL']
     pixel_scale_super_sampled = psf[2].header['PIXELSCL']
     fwhm = webbpsf.measure_fwhm(psf, ext=0)
@@ -53,6 +64,7 @@ for band in nircam_band_list:
             'over_sampled_psf': psf[2].data,
             'pixel_scale_psf': pixel_scale,
             'pixel_scale_psf_over_sampled': pixel_scale_super_sampled,
+            'n_over_sampled': super_sample_factor_nircam,
             # parametrization of the radial profile
             'radius_arcsec': rad_profile_stat_dict['rad'],
             'psf_profile': rad_profile_stat_dict['profile'],
@@ -83,13 +95,23 @@ with open('data_output/nircam_psf_dict.npy', 'wb') as file_name:
 
 psf_dict_jwst_miri = {}
 for band in miri_band_list:
-
+    if band in ['F1065C', 'F1140C', 'F1550C', 'F2300C']:
+        continue
     nrc = webbpsf.MIRI()
     nrc.filter = band
+
+
+    empirical_fwhm_pix = phys_params.miri_empirical_fwhm[band]['fwhm_pix']
+    # compute fov pixel size
+    fov_pixels = np.rint(empirical_fwhm_pix * psf_scaling_size)
+    # make sure the number is odd
+    if fov_pixels % 2 == 0:
+        fov_pixels += 1
+    # compute psf
     psf = nrc.calc_psf(oversample=super_sample_factor_miri,
-                       #fov_pixels=601
-                       fov_arcsec=20,
-                       )
+                            fov_pixels=fov_pixels)
+    print('shape over sampeled ', psf[2].data.shape)
+    print('shape native scale ', psf[3].data.shape)
 
     pixel_scale = psf[3].header['PIXELSCL']
     pixel_scale_super_sampled = psf[2].header['PIXELSCL']
@@ -119,6 +141,7 @@ for band in miri_band_list:
             'over_sampled_psf': psf[2].data,
             'pixel_scale_psf': pixel_scale,
             'pixel_scale_psf_over_sampled': pixel_scale_super_sampled,
+            'n_over_sampled': super_sample_factor_miri,
             # parametrization of the radial profile
             'radius_arcsec': rad_profile_stat_dict['rad'],
             'psf_profile': rad_profile_stat_dict['profile'],

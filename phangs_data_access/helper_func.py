@@ -107,7 +107,6 @@ class CoordTools:
         -------
         central_target_coords : ``astropy.coordinates.SkyCoord``
         """
-        from astroquery.simbad import Simbad
         # get the center of the target
         simbad_table = Simbad.query_object(target_name)
 
@@ -279,6 +278,9 @@ class CoordTools:
 
         return length_in_pix * wcs.proj_plane_pixel_scales()[dim].to(u.arcsec).value
 
+    @staticmethod
+    def mask_2d_region_in_cube(cube, wcs_2d, ra, dec, cutoutsize):
+        print('lalala')
 
 class UnitTools:
     """
@@ -581,6 +583,20 @@ class UnitTools:
         return phys_params.astrosat_bands_wave[band]["zp_vega"]
 
     @staticmethod
+    def get_roman_vega_zp(band):
+        """
+        Function to get ROMAN Vega zero point flux in Jy
+        Parameters
+        ----------
+        band : str
+        Return
+        ------
+        zp_vega_flux : float
+            Zero-point flux in Jy
+        """
+        return phys_params.roman_bands_wave[band]["zp_vega"]
+
+    @staticmethod
     def conv_mjy2vega(flux, telescope, instrument, band):
         """
         This function converts
@@ -591,6 +607,8 @@ class UnitTools:
             zp_vega_flux = UnitTools.get_jwst_vega_zp(instrument=instrument, band=band)
         elif telescope == 'astrosat':
             zp_vega_flux = UnitTools.get_astrosat_vega_zp(band=band)
+        elif telescope == 'roman':
+            zp_vega_flux = UnitTools.get_roman_vega_zp(band=band)
         else:
             raise KeyError('telescope musst be hst, jwst or astrosat')
 
@@ -622,8 +640,6 @@ class UnitTools:
 
         return (10 ** (vega_mag/(-2.5))) * zp_vega_flux * 1e3
 
-
-
     @staticmethod
     def conv_mjy2vega_old(flux, ab_zp=None, vega_zp=None, target=None, band=None):
         """
@@ -644,6 +660,46 @@ class UnitTools:
         vega_mag = ab_mag + zp_diff
 
         return vega_mag
+
+    @staticmethod
+    def conv_flux2lum(flux, dist_mpc):
+        dist_cm = (dist_mpc * u.Mpc).to(u.cm).value
+        return flux * (4 * np.pi) * (dist_cm ** 2)
+
+    @staticmethod
+    def conv_flux2lum_uncertainty(flux, flux_err, dist_mpc):
+        dist_cm = (dist_mpc * u.Mpc).to(u.cm).value
+
+
+
+        return flux * (4 * np.pi) * (dist_cm ** 2)
+
+
+class TransTools:
+    """
+    Tools to transform quantities
+    """
+    @staticmethod
+    def gauss_sig2fwhm(sig):
+        """
+        see https://en.wikipedia.org/wiki/Full_width_at_half_maximum
+        """
+        return sig*(2 * np.sqrt(2*np.log(2)))
+
+    @staticmethod
+    def gauss_fwhm2sig(fwhm):
+        """
+        see https://en.wikipedia.org/wiki/Full_width_at_half_maximum
+        """
+        return fwhm/(2 * np.sqrt(2*np.log(2)))
+
+    @staticmethod
+    def gauss_integral1d(amp, sig):
+        return amp * sig * np.sqrt(2 * np.pi)
+
+    @staticmethod
+    def gauss_integral2d(amp, sig):
+        return amp * 2 * np.pi * (sig ** 2)
 
 
 class FileTools:
@@ -1001,6 +1057,26 @@ class ObsTools:
             return UnitTools.angstrom2unit(wave=phys_params.hst_wfc3_ir_bands_wave[band][wave_estimator], unit=unit)
         else:
             raise KeyError(instrument, ' is not a HST instrument')
+
+
+    @staticmethod
+    def get_roman_band_wave(band, wave_estimator='mean_wave', unit='mu'):
+        """
+        Returns mean wavelength of an HST specific band
+        Parameters
+        ----------
+        band : str
+        instrument : str
+        wave_estimator: str
+            can be mean_wave, min_wave or max_wave
+        unit : str
+
+        Returns
+        -------
+        wavelength : float
+        """
+        return UnitTools.angstrom2unit(wave=phys_params.roman_bands_wave[band][wave_estimator], unit=unit)
+
 
     @staticmethod
     def get_jwst_band_wave(band, instrument='nircam', wave_estimator='mean_wave', unit='mu'):
@@ -1466,12 +1542,23 @@ class GeometryTools:
             return (y_mesh == np.rint(y_values_1)) | (y_mesh == np.rint(y_values_2)) | (x_mesh == np.rint(x_values_1)) | (x_mesh == np.rint(x_values_2))
 
     @staticmethod
+    def get_img_mask_pix_in_circ(data, x_pos, y_pos, rad):
+        x_pixels = np.arange(data.shape[1])
+        y_pixels = np.arange(data.shape[0])
+        x_mesh, y_mesh = np.meshgrid(x_pixels, y_pixels)
+
+        return np.sqrt((x_mesh - x_pos) ** 2 + (y_mesh - y_pos) ** 2) < rad
+
+    @staticmethod
+    def select_img_pix_in_circ(data, x_pos, y_pos, rad):
+        return data[GeometryTools.get_img_mask_pix_in_circ(data=data, x_pos=x_pos, y_pos=y_pos, rad=rad)]
+
+    @staticmethod
     def get_2d_array_value_from_pix_coords(array, x_pos, y_pos):
         # it is important to know that an array is organized in rows first and then columns.
         # Thus, when selecting a value of an 2D array from coordinates it is important to know that this appears
         # flipped.
         return array[int(np.rint(y_pos)), int(np.rint(x_pos))]
-
 
 
 class SpecHelper:
@@ -1485,6 +1572,37 @@ class SpecHelper:
         else:
             data_identifier = res
         return data_identifier
+
+
+class FuncAndModels:
+    @staticmethod
+    def lin_func(p, x):
+        gradient, intersect = p
+        return gradient * x + intersect
+
+    @staticmethod
+    def gauss1d(x_data, amp, mu, sig):
+        return amp * np.exp(-(x_data - mu) ** 2 / (2 * sig ** 2))
+
+    @staticmethod
+    def gauss2d_rot(x, y, amp, x0, y0, sig_x, sig_y, theta):
+        sigx2 = sig_x ** 2
+        sigy2 = sig_y ** 2
+        a = np.cos(theta) ** 2 / (2 * sigx2) + np.sin(theta) ** 2 / (2 * sigy2)
+        b = np.sin(theta) ** 2 / (2 * sigx2) + np.cos(theta) ** 2 / (2 * sigy2)
+        c = np.sin(2 * theta) / (4 * sigx2) - np.sin(2 * theta) / (4 * sigy2)
+
+        expo = -a * (x - x0) ** 2 - b * (y - y0) ** 2 - 2 * c * (x - x0) * (y - y0)
+
+        return amp * np.exp(expo)
+
+    @staticmethod
+    def moffat1d(rad, beta, alpha):
+        return ((beta-1) / (np.pi*(alpha**2))) * (1 + (rad**2 / (alpha**2)))**(-beta)
+
+    @staticmethod
+    def moffat2d(x, y, beta, alpha):
+        return ((beta-1) / (np.pi*(alpha**2))) * (1 + ((x**2 + y**2) / (alpha**2)))**(-beta)
 
 
 class FitTools:
@@ -1570,7 +1688,6 @@ class FitTools:
 
 
         return {'amp': amp, 'mu': mu, 'sig': sig, 'amp_err': amp_err, 'mu_err': mu_err, 'sig_err': sig_err}
-
 
 
 

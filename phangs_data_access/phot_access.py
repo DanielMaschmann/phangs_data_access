@@ -666,37 +666,37 @@ class PhotAccess:
         # get also pixel sizes
         pixel_size = getattr(self, '%s_bands_data' % instrument)['%s_pixel_area_size_sr_img' % band]
         # check if units are in the list of possible transformations
-        assert old_unit in ['mJy', 'Jy', 'MJy/sr', 'erg A-1 cm-2 s-1']
-        assert new_unit in ['mJy', 'Jy', 'MJy/sr', 'erg A-1 cm-2 s-1']
-
-        conversion_factor = 1
-        if old_unit != new_unit:
-            # now first change the conversion factor to Jy
-            if old_unit == 'mJy':
-                conversion_factor *= 1e-3
-            elif old_unit == 'MJy/sr':
-                conversion_factor *= (1e6 * pixel_size)
-            elif old_unit == 'erg A-1 cm-2 s-1':
-                # The conversion from erg A-1 cm-2 s-1 is well described in
-                # https://www.physicsforums.com/threads/unit-conversion-flux-densities.742561/
-                # se also
-                # https://www.physicsforums.com/threads/unit-conversion-of-flux-jansky-to-erg-s-cm-a-simplified-guide.927166/
-                # we use fv dv = fλ dλ
-                # fλ = fv dv/dλ
-                # and because v = c/λ...
-                # fλ = fv*c / λ^2
-                # thus the conversion factor is:
-                conversion_factor = 1e23 * 1e-8 * (band_wave ** 2) / (speed_of_light * 1e2)
-                # the speed of light is in m/s the factor 1-e2 changes it to cm/s
-                # the factor 1e8 changes Angstrom to cm (the Angstrom was in the nominator therefore it is 1/1e-8)
-
-            # now convert to new unit
-            if new_unit == 'mJy':
-                conversion_factor *= 1e3
-            elif new_unit == 'MJy/sr':
-                conversion_factor *= 1e-6 / pixel_size
-            elif new_unit == 'erg A-1 cm-2 s-1':
-                conversion_factor *= 1e-23 * 1e8 * (speed_of_light * 1e2) / (band_wave ** 2)
+        # assert old_unit in ['mJy', 'Jy', 'MJy/sr', 'erg A-1 cm-2 s-1']
+        # assert new_unit in ['mJy', 'Jy', 'MJy/sr', 'erg A-1 cm-2 s-1']
+        #
+        # conversion_factor = 1
+        # if old_unit != new_unit:
+        #     # now first change the conversion factor to Jy
+        #     if old_unit == 'mJy':
+        #         conversion_factor *= 1e-3
+        #     elif old_unit == 'MJy/sr':
+        #         conversion_factor *= (1e6 * pixel_size)
+        #     elif old_unit == 'erg A-1 cm-2 s-1':
+        #         # The conversion from erg A-1 cm-2 s-1 is well described in
+        #         # https://www.physicsforums.com/threads/unit-conversion-flux-densities.742561/
+        #         # se also
+        #         # https://www.physicsforums.com/threads/unit-conversion-of-flux-jansky-to-erg-s-cm-a-simplified-guide.927166/
+        #         # we use fv dv = fλ dλ
+        #         # fλ = fv dv/dλ
+        #         # and because v = c/λ...
+        #         # fλ = fv*c / λ^2
+        #         # thus the conversion factor is:
+        #         conversion_factor = 1e23 * 1e-8 * (band_wave ** 2) / (speed_of_light * 1e2)
+        #         # the speed of light is in m/s the factor 1-e2 changes it to cm/s
+        #         # the factor 1e8 changes Angstrom to cm (the Angstrom was in the nominator therefore it is 1/1e-8)
+        #
+        #     # now convert to new unit
+        #     if new_unit == 'mJy':
+        #         conversion_factor *= 1e3
+        #     elif new_unit == 'MJy/sr':
+        #         conversion_factor *= 1e-6 / pixel_size
+        #     elif new_unit == 'erg A-1 cm-2 s-1':
+        #         conversion_factor *= 1e-23 * 1e8 * (speed_of_light * 1e2) / (band_wave ** 2)
 
         conversion_factor = helper_func.UnitTools.get_flux_unit_conv_fact(old_unit=old_unit, new_unit=new_unit,
                                                                           pixel_size=pixel_size, band_wave=band_wave)
@@ -764,19 +764,20 @@ class PhotAccess:
             #                         img=self.hst_bands_data['%s_data_err' % band],
             #                         wcs=self.hst_bands_data['%s_wcs_err' % band],
             #                         coord=cutout_pos, cutout_size=cutout_size[band_index])})
-            if band == (helper_func.ObsTools.get_hst_ha_band(target=self.phot_hst_ha_cont_sub_target_name) + '_cont_sub'):
-                cutout_dict.update({
-                    '%s_img_cutout' % band:
-                        helper_func.CoordTools.get_img_cutout(img=self.hst_ha_cont_sub_bands_data['%s_data_img' % band],
-                                                              wcs=self.hst_ha_cont_sub_bands_data['%s_wcs_img' % band],
-                                                              coord=cutout_pos, cutout_size=cutout_size[band_index])})
-                if include_err:
+            if helper_func.ObsTools.check_hst_ha_obs(target=self.phot_hst_ha_cont_sub_target_name):
+                if band == (helper_func.ObsTools.get_hst_ha_band(target=self.phot_hst_ha_cont_sub_target_name) + '_cont_sub'):
                     cutout_dict.update({
-                        '%s_err_cutout' % band:
-                            helper_func.CoordTools.get_img_cutout(
-                                img=self.hst_ha_cont_sub_bands_data['%s_data_err' % band],
-                                wcs=self.hst_ha_cont_sub_bands_data['%s_wcs_err' % band],
-                                coord=cutout_pos, cutout_size=cutout_size[band_index])})
+                        '%s_img_cutout' % band:
+                            helper_func.CoordTools.get_img_cutout(img=self.hst_ha_cont_sub_bands_data['%s_data_img' % band],
+                                                                  wcs=self.hst_ha_cont_sub_bands_data['%s_wcs_img' % band],
+                                                                  coord=cutout_pos, cutout_size=cutout_size[band_index])})
+                    if include_err:
+                        cutout_dict.update({
+                            '%s_err_cutout' % band:
+                                helper_func.CoordTools.get_img_cutout(
+                                    img=self.hst_ha_cont_sub_bands_data['%s_data_err' % band],
+                                    wcs=self.hst_ha_cont_sub_bands_data['%s_wcs_err' % band],
+                                    coord=cutout_pos, cutout_size=cutout_size[band_index])})
 
             if helper_func.ObsTools.check_nircam_obs(target=self.phot_nircam_target_name):
                 if band in helper_func.ObsTools.get_nircam_obs_band_list(target=self.phot_nircam_target_name):
@@ -814,6 +815,13 @@ class PhotAccess:
                             helper_func.CoordTools.get_img_cutout(img=self.astrosat_bands_data['%s_data_img' % band],
                                                                   wcs=self.astrosat_bands_data['%s_wcs_img' % band],
                                                                   coord=cutout_pos, cutout_size=cutout_size[band_index])})
+                    if include_err:
+                        cutout_dict.update({
+                            '%s_err_cutout' % band:
+                                helper_func.CoordTools.get_img_cutout(img=self.astrosat_bands_data['%s_data_err' % band],
+                                                                      wcs=self.astrosat_bands_data['%s_wcs_err' % band],
+                                                                      coord=cutout_pos,
+                                                                      cutout_size=cutout_size[band_index])})
         return cutout_dict
 
     def get_hst_median_exp_time(self, band):
@@ -995,13 +1003,12 @@ class PhotAccess:
             if cutout_size[0] <= bkg_img_size_factor * fwhm_arcsec:
                 bkg_cutout_size_x = bkg_img_size_factor * fwhm_arcsec
             else:
-                bkg_cutout_size_x = cutout_size[0]
+                bkg_cutout_size_x = cutout_size[0] + fwhm_arcsec * 5
             if cutout_size[1] <= bkg_img_size_factor * fwhm_arcsec:
                 bkg_cutout_size_y = bkg_img_size_factor * fwhm_arcsec
             else:
-                bkg_cutout_size_y = cutout_size[1]
+                bkg_cutout_size_y = cutout_size[1] + fwhm_arcsec * 5
             bkg_cutout_size = (bkg_cutout_size_x, bkg_cutout_size_y)
-
         cutout_dict_bkg = self.get_band_cutout_dict(
             ra_cutout=ra, dec_cutout=dec, cutout_size=bkg_cutout_size, band_list=[band], include_err=False)
 
@@ -1071,6 +1078,69 @@ class PhotAccess:
                             }
 
         return region_topo_dict
+
+    def compute_morph_phot(self, ra, dec, band, instrument, cutout_size,
+                        src_stats_rad_factor=3, bkg_img_size_factor=60, bkg_box_size_factor=2,
+                        bkg_filter_size_factor=1, bkg_do_sigma_clip=True, bkg_sigma=3.0, bkg_maxiters=10,
+                        bkg_method='SExtractorBackground',
+                           profile_n_slits=12, max_rad_profile_fact=3,
+                           morph_fit_upper_sig_fact=10,
+                           morph_fit_central_rad_fact=3, morph_fit_model_pos_rad_accept_fact=1):
+
+        region_topo_dict = self.get_region_topo(
+            ra=ra, dec=dec, band=band, instrument=instrument, cutout_size=cutout_size,
+            src_stats_rad_factor=src_stats_rad_factor, bkg_img_size_factor=bkg_img_size_factor,
+            bkg_box_size_factor=bkg_box_size_factor, bkg_filter_size_factor=bkg_filter_size_factor,
+            bkg_do_sigma_clip=bkg_do_sigma_clip, bkg_sigma=bkg_sigma, bkg_maxiters=bkg_maxiters, bkg_method=bkg_method)
+
+        profile_dict_src_bkg_sub = phot_tools.ProfileTools.get_rad_profile_dict(
+            img=region_topo_dict['img'] - region_topo_dict['bkg'], wcs=region_topo_dict['wcs'],
+            ra=ra, dec=dec, n_slits=profile_n_slits,
+            max_rad_arcsec=region_topo_dict['psf_fwhm'] * max_rad_profile_fact,
+            img_err=region_topo_dict['img_err'],
+            img_mask=region_topo_dict['mask_bad_pixels'])
+        pos_pix = region_topo_dict['wcs'].world_to_pixel(SkyCoord(ra=ra*u.deg, dec=dec*u.deg))
+
+
+
+        morph_dict = phot_tools.ProfileTools.measure_morph_photometry(
+            topo_dict=region_topo_dict, band=band, instrument=instrument,
+            x_center=pos_pix[0], ycenter=pos_pix[1],
+            rad_profile_dict=profile_dict_src_bkg_sub['slit_profile_dict'],
+            std_pix=region_topo_dict['psf_std_pix'], upper_sig_fact=morph_fit_upper_sig_fact,
+            central_rad_fact=morph_fit_central_rad_fact, model_pos_rad_accept_fact=morph_fit_model_pos_rad_accept_fact)
+
+        # print(morph_dict)
+        #
+        # import matplotlib.pyplot as plt
+        # plt.close()
+        # plt.imshow(region_topo_dict['img'])
+        # plt.show()
+
+        return morph_dict
+
+    def compute_ci(self, ra, dec, band, instrument, cutout_size,
+                        src_stats_rad_factor=3, bkg_img_size_factor=60, bkg_box_size_factor=2,
+                        bkg_filter_size_factor=1, bkg_do_sigma_clip=True, bkg_sigma=3.0, bkg_maxiters=10,
+                        bkg_method='SExtractorBackground'):
+
+        # get psf
+        psf_std = phot_tools.PSFTools.load_obs_psf_dict(band=band, instrument=instrument)
+        rad_1_arcsec = psf_std['ee_25percent']
+        rad_2_arcsec = psf_std['ee_80percent']
+
+        region_topo_dict = self.get_region_topo(
+            ra=ra, dec=dec, band=band, instrument=instrument, cutout_size=cutout_size,
+            src_stats_rad_factor=src_stats_rad_factor, bkg_img_size_factor=bkg_img_size_factor,
+            bkg_box_size_factor=bkg_box_size_factor, bkg_filter_size_factor=bkg_filter_size_factor,
+            bkg_do_sigma_clip=bkg_do_sigma_clip, bkg_sigma=bkg_sigma, bkg_maxiters=bkg_maxiters, bkg_method=bkg_method)
+
+        return phot_tools.ApertTools.compute_annulus_ci(img=region_topo_dict['img'] - region_topo_dict['bkg'],
+                                                 img_err=region_topo_dict['img'], wcs=region_topo_dict['wcs'],
+            ra=ra, dec=dec, rad_1_arcsec=rad_1_arcsec, rad_2_arcsec=rad_2_arcsec)
+
+
+
 
     #
     # def src_detect_in_cutout(self,

@@ -293,6 +293,24 @@ astrosat_bands_wave = {
     'ND1': {'pivot_wave': 4354.00, 'mean_wave': 4354.00, 'min_wave': 3584.82, 'max_wave': 5452.59, 'zp_vega': 3631.00},
     'VIS3': {'pivot_wave': 4614.00, 'mean_wave': 4614.00, 'min_wave': 3878.26, 'max_wave': 5325.00, 'zp_vega': 3631.00},
 }
+
+
+roman_bands_wave = {
+    'F062': {'pivot_wave': 6290.80, 'mean_wave': 6434.12, 'min_wave': 4633.82, 'max_wave': 7888.11, 'zp_vega': 3174.18},
+    'F087': {'pivot_wave': 8695.98, 'mean_wave': 8764.83, 'min_wave': 7328.23, 'max_wave': 10133.08, 'zp_vega': 2294.04},
+    'F106': {'pivot_wave': 10566.52, 'mean_wave': 10652.07, 'min_wave': 8938.32, 'max_wave': 12357.27, 'zp_vega': 1967.08},
+    'F129': {'pivot_wave': 12901.34, 'mean_wave': 13005.01, 'min_wave': 10907.72, 'max_wave': 15074.53, 'zp_vega': 1483.60},
+    'Prism': {'pivot_wave': 12499.08, 'mean_wave': 13584.80, 'min_wave': 7403.20, 'max_wave': 18230.22, 'zp_vega': 1683.10},
+    'Grism': {'pivot_wave': 14246.69, 'mean_wave': 14885.70, 'min_wave': 9950.28, 'max_wave': 19394.91, 'zp_vega': 1355.34},
+    'F146': {'pivot_wave': 14377.83, 'mean_wave': 15378.47, 'min_wave': 8957.65, 'max_wave': 20731.99, 'zp_vega': 1396.74},
+    'F158': {'pivot_wave': 15748.67, 'mean_wave': 15875.37, 'min_wave': 13310.97, 'max_wave': 18389.02, 'zp_vega': 1091.96},
+    'F184': {'pivot_wave': 18394.10, 'mean_wave': 18466.13, 'min_wave': 16227.63, 'max_wave': 20732.13, 'zp_vega': 854.12},
+    'F213': {'pivot_wave': 21229.96, 'mean_wave': 21306.18, 'min_wave': 18805.31, 'max_wave': 23835.10, 'zp_vega': 675.72},
+}
+
+
+
+
 # spectroscopy gratings
 miri_gratings = {
     'channel_1': {'FOV': (3.2, 3.7), 'pixel_size_arcsec': 0.176, 'wave_min': 4.9, 'wave_max': 7.65},
@@ -322,6 +340,37 @@ nirspec_gratings = {
 # We use the empirical EE estimation
 # Latest updates of webpage 27 Nov 2022
 # version April/23/2023
+nircam_empirical_fwhm = {
+    'F070W': {'pivot_wave': 0.704, 'fwhm_arcsec': 0.029, 'fwhm_pix': 0.935},
+    'F090W': {'pivot_wave': 0.901, 'fwhm_arcsec': 0.033, 'fwhm_pix': 1.065},
+    'F115W': {'pivot_wave': 1.154, 'fwhm_arcsec': 0.040, 'fwhm_pix': 1.290},
+    'F140M': {'pivot_wave': 1.404, 'fwhm_arcsec': 0.048, 'fwhm_pix': 1.548},
+    'F150W': {'pivot_wave': 1.501, 'fwhm_arcsec': 0.050, 'fwhm_pix': 1.613},
+    'F162M': {'pivot_wave': 1.626, 'fwhm_arcsec': 0.055, 'fwhm_pix': 1.774},
+    'F164N': {'pivot_wave': 1.644, 'fwhm_arcsec': 0.056, 'fwhm_pix': 1.806},
+    'F150W2': {'pivot_wave': 1.671, 'fwhm_arcsec': None, 'fwhm_pix': None},
+    'F182M': {'pivot_wave': 1.845, 'fwhm_arcsec': 0.062, 'fwhm_pix': 2.000},
+    'F187N': {'pivot_wave': 1.874, 'fwhm_arcsec': 0.064, 'fwhm_pix': 2.065},
+    'F200W': {'pivot_wave': 1.990, 'fwhm_arcsec': 0.066, 'fwhm_pix': 2.129},
+    'F210M': {'pivot_wave': 2.093, 'fwhm_arcsec': 0.071, 'fwhm_pix': 2.290},
+    'F212N': {'pivot_wave': 2.120, 'fwhm_arcsec': 0.072, 'fwhm_pix': 2.323},
+    'F250M': {'pivot_wave': 2.503, 'fwhm_arcsec': 0.085, 'fwhm_pix': 1.349},
+    'F277W': {'pivot_wave': 2.786, 'fwhm_arcsec': 0.092, 'fwhm_pix': 1.460},
+    'F300M': {'pivot_wave': 2.996, 'fwhm_arcsec': 0.100, 'fwhm_pix': 1.587},
+    'F322W2': {'pivot_wave': 3.247, 'fwhm_arcsec': None, 'fwhm_pix': None},
+    'F323N': {'pivot_wave': 3.237, 'fwhm_arcsec': 0.108, 'fwhm_pix': 1.714},
+    'F335M': {'pivot_wave': 3.365, 'fwhm_arcsec': 0.111, 'fwhm_pix': 1.762},
+    'F356W': {'pivot_wave': 3.563, 'fwhm_arcsec': 0.116, 'fwhm_pix': 1.841},
+    'F360M': {'pivot_wave': 3.621, 'fwhm_arcsec': 0.120, 'fwhm_pix': 1.905},
+    'F405N': {'pivot_wave': 4.055, 'fwhm_arcsec': 0.136, 'fwhm_pix': 2.159},
+    'F410M': {'pivot_wave': 4.092, 'fwhm_arcsec': 0.137, 'fwhm_pix': 2.175},
+    'F430M': {'pivot_wave': 4.280, 'fwhm_arcsec': 0.144, 'fwhm_pix': 2.286},
+    'F444W': {'pivot_wave': 4.421, 'fwhm_arcsec': 0.145, 'fwhm_pix': 2.302},
+    'F460M': {'pivot_wave': 4.624, 'fwhm_arcsec': 0.157, 'fwhm_pix': 2.492},
+    'F466N': {'pivot_wave': 4.654, 'fwhm_arcsec': 0.158, 'fwhm_pix': 2.508},
+    'F470N': {'pivot_wave': 4.707, 'fwhm_arcsec': 0.160, 'fwhm_pix': 2.540},
+    'F480M': {'pivot_wave': 4.834, 'fwhm_arcsec': 0.164, 'fwhm_pix': 2.603}
+}
 nircam_empirical_ee_apertures_arcsec = {
     'F070W': {'ee50': 0.038, 'ee80': 0.173},
     'F090W': {'ee50': 0.034, 'ee80': 0.157},
@@ -359,6 +408,19 @@ nircam_empirical_ee_apertures_arcsec = {
 # https://jwst-docs.stsci.edu/jwst-mid-infrared-instrument/miri-performance/miri-point-spread-functions
 # version 12/06/2022
 # here we gather the FWHM from empirical measurements and the according ee energy value
+
+miri_empirical_fwhm = {
+    'F560W' : {'pivot_wave_mu': 5.589, 'fwhm_arcsec': 0.207, 'fwhm_pix': 1.882},
+    'F770W' : {'pivot_wave_mu': 7.528, 'fwhm_arcsec': 0.269, 'fwhm_pix': 2.445},
+    'F1000W' : {'pivot_wave_mu': 9.883, 'fwhm_arcsec': 0.328, 'fwhm_pix': 2.982},
+    'F1130W' : {'pivot_wave_mu': 11.298, 'fwhm_arcsec': 0.375, 'fwhm_pix': 3.409},
+    'F1280W' : {'pivot_wave_mu': 12.712, 'fwhm_arcsec': 0.420, 'fwhm_pix': 3.818},
+    'F1500W' : {'pivot_wave_mu': 14.932, 'fwhm_arcsec': 0.488, 'fwhm_pix': 4.436},
+    'F1800W' : {'pivot_wave_mu': 17.875, 'fwhm_arcsec': 0.591, 'fwhm_pix': 5.373},
+    'F2100W' : {'pivot_wave_mu': 20.563, 'fwhm_arcsec': 0.674, 'fwhm_pix': 6.127},
+    'F2550W' : {'pivot_wave_mu': 25.147, 'fwhm_arcsec': 0.803, 'fwhm_pix': 7.300}
+}
+
 miri_empirical_ee_apertures_arcsec = {
     'F560W': {'FWHM': 0.207, 'ee': 0.59},
     'F770W': {'FWHM': 0.269, 'ee': 0.62},
@@ -370,6 +432,79 @@ miri_empirical_ee_apertures_arcsec = {
     'F2100W': {'FWHM': 0.674, 'ee': 0.72},
     'F2550W': {'FWHM': 0.803, 'ee': 0.68}
 }
+
+# taken from Tandon+2017 (2017AJ....154..128T)
+astrosat_psf_fwhm_arcsec = {
+    'fuv': 1.31,
+    'fuv_err': 0.10,
+    'nuv': 1.26,
+    'nuv_err': 0.15,
+}
+
+
+# see Tandon+2017 Table 5
+astrosat_empirical_ee_apertures_fuv_pix = {
+    '1': 13.46,
+    '2': 38.35,
+    '3': 57.27,
+    '4': 68.82,
+    '5': 75.62,
+    '6': 80.09,
+    '7': 83.29,
+    '8': 85.70,
+    '9': 87.71,
+    '10': 89.45,
+    '11': 90.85,
+    '12': 92.12,
+    '13': 93.27,
+    '14': 94.26,
+    '15': 95.07,
+    '16': 95.77,
+    '17': 96.44,
+    '18': 97.07,
+    '19': 97.59,
+    '20': 98.03,
+    '22': 98.73,
+    '24': 99.22,
+    '26': 99.65,
+    '27': 99.78
+}
+
+astrosat_empirical_ee_apertures_nuv_pix = {
+    '1': 14.98,
+    '2': 40.74,
+    '3': 58.28,
+    '4': 68.14,
+    '5': 73.81,
+    '6': 77.82,
+    '7': 80.85,
+    '8': 83.63,
+    '9': 83.63,
+    '10': 88.21,
+    '11': 90.29,
+    '12': 92.10,
+    '13': 93.39,
+    '14': 94.40,
+    '15': 95.22,
+    '16': 95.94,
+    '17': 96.69,
+    '18': 97.30,
+    '19': 97.77,
+    '20': 98.26,
+    '22': 99.04,
+    '24': 99.55,
+    '26': 99.90,
+    '27': 99.95,
+}
+
+
+
+
+
+
+
+
+
 
 ############################################################
 #### aperture corrections for various telescope filters ####
@@ -676,11 +811,21 @@ opt_line_wave = {
             'nbursts_name': '[N II] 5756',
             'rcsed_name': 'NII5756.19'},
     5877: {'line_name': 'hei',
-            'transition': 'forbidden',
-            'air_wave': 5875.624,
-            'vac_wave': 5877.255,
-            'nbursts_name': 'He I 5877',
-            'rcsed_name': 'HeI5877.25'},
+           'transition': 'forbidden',
+           'air_wave': 5875.624,
+           'vac_wave': 5877.255,
+           'nbursts_name': 'He I 5877',
+           'rcsed_name': 'HeI5877.25'},
+    5892: {'line_name': 'NaD',
+           'transition': 'absorption',
+           'air_wave': 5889.9510,
+           'vac_wave': 5891.5833,
+           'plot_name': 'NaD 5892'},
+    5898: {'line_name': 'NaD',
+           'transition': 'absorption',
+           'air_wave': 5895.9242,
+           'vac_wave': 5897.5581,
+           'plot_name': 'NaD 5898'},
     6302: {'line_name': 'oi',
             'transition': 'forbidden',
             'air_wave': 6300.304,
@@ -751,7 +896,27 @@ opt_line_wave = {
             'nbursts_name': '[S II] 6732',
             'rcsed_name': 'SII6732.67',
             'manga_name': 'sii_6732',
-            'plot_name': r'[SII]6733'}}
+            'plot_name': r'[SII]6733'},
+    8500: {'line_name': 'caii',
+           'transition': 'absorption',
+           'air_wave': 8498.02,
+           'vac_wave': 8500.36,
+           'plot_name': 'Ca II 8500'},
+    8544: {'line_name': 'caii',
+           'transition': 'absorption',
+           'air_wave': 8542.09,
+           'vac_wave': 8544.44,
+           'plot_name': 'Ca II 8544'},
+    8665: {'line_name': 'caii',
+           'transition': 'absorption',
+           'air_wave': 8662.14,
+           'vac_wave': 8664.52,
+           'plot_name': 'Ca II 8665'},
+
+
+
+
+}
 
 # theoretical emission line ratios taken from the python package pyneb
 # print(pyneb.Atom('O', 3).getHighDensRatio(wave1=5007, wave2=4959))

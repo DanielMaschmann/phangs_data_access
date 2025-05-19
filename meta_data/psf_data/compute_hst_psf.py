@@ -28,7 +28,7 @@ wfc3_ir_band_list = phangs_info.wfc3_ir_psf_band_list
 
 psf_dict_hst_acs_wfc = {}
 for band in acs_wfc_band_list:
-
+    # getting empirical PSF. This PSF is oversampeled by a factor of 4
     if os.path.isfile(f'data/ACSWFC/STDPSF_ACSWFC_{band}.fits'):
         file_name = f'data/ACSWFC/STDPSF_ACSWFC_{band}.fits'
     elif os.path.isfile(f'data/ACSWFC/STDPSF_ACSWFC_{band}_SM4.fits'):
@@ -40,6 +40,10 @@ for band in acs_wfc_band_list:
     hdu = fits.open(file_name)
     data = hdu[0].data
     mean_psf = np.mean(data, axis=0)
+
+
+
+
 
     central_x_pos = mean_psf.shape[0]/2
     central_y_pos = mean_psf.shape[1]/2
@@ -64,6 +68,7 @@ for band in acs_wfc_band_list:
             # the PSF itself
             'over_sampled_psf': mean_psf,
             'pixel_scale_psf_over_sampled': (pixel_size_acs_wfc / super_sample_factor_acs_wfc),
+            'n_over_sampled' : super_sample_factor_acs_wfc,
             # parametrization of the radial profile
             'radius_arcsec': rad_profile_stat_dict['rad'],
             'psf_profile': rad_profile_stat_dict['profile'],
@@ -124,6 +129,7 @@ for band in wfc3_uv_band_list:
             # the PSF itself
             'over_sampled_psf': mean_psf,
             'pixel_scale_psf_over_sampled': (pixel_size_wfc3_uvis / super_sample_factor_wfc3_uvis),
+            'n_over_sampled': super_sample_factor_wfc3_uvis,
             # parametrization of the radial profile
             'radius_arcsec': rad_profile_stat_dict['rad'],
             'psf_profile': rad_profile_stat_dict['profile'],
@@ -178,6 +184,7 @@ for band in wfc3_ir_band_list:
             # the PSF itself
             'over_sampled_psf': mean_psf,
             'pixel_scale_psf_over_sampled': (pixel_size_wfc3_ir / super_sample_factor_wfc3_ir),
+            'n_over_sampled': super_sample_factor_wfc3_ir,
             # parametrization of the radial profile
             'radius_arcsec': rad_profile_stat_dict['rad'],
             'psf_profile': rad_profile_stat_dict['profile'],

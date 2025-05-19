@@ -1,11 +1,13 @@
 """
 Tools for spectrsocopic analysis
 """
+
 import matplotlib.pyplot as plt
 import numpy as np
 import ppxf.ppxf_util as util
 
 from astropy import constants as const
+
 speed_of_light_kmps = const.c.to('km/s').value
 from scipy.constants import c as speed_of_light_mps
 
@@ -15,8 +17,9 @@ from ppxf.ppxf import ppxf
 import ppxf.sps_util as lib
 from urllib import request
 from TardisPipeline.readData.MUSE_WFM import get_MUSE_polyFWHM
-from phangs_data_access import phys_params
+from phangs_data_access import phys_params, sample_access
 from phangs_data_access.em_line_fit import FitModels
+
 
 class SpecTools:
     def __init__(self):
@@ -126,6 +129,7 @@ class SpecTools:
     def conv_helio_cen_vel2obs_line_wave(line_vel, line, vel_unit='kmps', line_ref='vac_wave'):
         return phys_params.opt_line_wave[line][line_ref] + SpecTools.conv_vel2delta_wave(line=line, vel=line_vel,
                                                                                    vel_unit=vel_unit, line_ref=line_ref)
+
     @staticmethod
     def conv_obs_line_wave2helio_cen_vel(obs_line_wave, line, vel_unit='kmps', line_ref='vac_wave'):
         line_offset = obs_line_wave - phys_params.opt_line_wave[line][line_ref]
@@ -139,12 +143,12 @@ class SpecTools:
         return FitModels.gaussian(x_values=x_data, amp=amp, mu=pos_peak, sig=sig_obs_wave)
 
     @staticmethod
-    def get_obs_gauss_from_fit_output(x_data, em_fit_dict, line, gauss_index, line_type='nl', vel_unit='kmps',
+    def get_obs_gauss_from_fit_output(x_data, em_line_fit_dict, line, gauss_index, line_type='nl', vel_unit='kmps',
                                       instrument='muse'):
 
-        amp = em_fit_dict['amp_%s_%i_gauss_%i' % (line_type, line, gauss_index)]
-        mu_vel = em_fit_dict['mu_%s_gauss_%i' % (line_type, gauss_index)]
-        sig_int_vel = em_fit_dict['sig_%s_gauss_%i' % (line_type, gauss_index)]
+        amp = em_line_fit_dict['amp_%s_%i_gauss_%i' % (line_type, line, gauss_index)]
+        mu_vel = em_line_fit_dict['mu_%s_gauss_%i' % (line_type, gauss_index)]
+        sig_int_vel = em_line_fit_dict['sig_%s_gauss_%i' % (line_type, gauss_index)]
 
         # get instrumental broadening
         sig_inst_broad_vel = SpecTools.get_inst_broad_sig(line=line, instrument=instrument, unit='kmps')
@@ -153,10 +157,111 @@ class SpecTools:
                                        vel_unit=vel_unit, line_ref=SpecTools.instrument2wave_ref(instrument=instrument))
 
     @staticmethod
-    def fit_ppxf2spec(spec_dict, target, sps_name='fsps', age_range=None, metal_range=None, ln_list=None,
-                      n_nl_gauss=1, n_nl_lorentz=0, n_bl_gauss=0, search_outflow=False,
-                      outflow_shift='redshift', outflow_mu_offset=400,outflow_sig=1200,
-                      init_mu_nl_gauss=100,  init_sig_nl_gauss=200):
+    def wave_window2mask(wave, wave_window):
+        if isinstance(wave_window, tuple):
+            mask_wave = (wave > wave_window[0]) & (wave < wave_window[1])
+        else:
+            mask_wave = np.zeros(len(wave), dtype=bool)
+            for window_idx in range(wave_window.shape[0]):
+                mask_wave += (wave > wave_window[window_idx, 0]) & (wave < wave_window[window_idx, 1])
+
+        return mask_wave
+
+    @staticmethod
+    def compute_ew(wave, flux, flux_err, line_window, continuum_window):
+
+        # get masks
+        # mask_line = (wave > line_window[0]) & (wave < line_window[1])
+        mask_line = SpecTools.wave_window2mask(wave=wave, wave_window=line_window)
+        mask_continuum = SpecTools.wave_window2mask(wave=wave, wave_window=continuum_window)
+        # # There can be ,multiple continuum windows
+        # if isinstance(continuum_window, tuple):
+        #     mask_continuum = (wave > continuum_window[0]) & (wave < continuum_window[1])
+        # else:
+        #     mask_continuum = np.zeros(len(wave), dtype=bool)
+        #     for window_idx in range(continuum_window.shape[0]):
+        #         mask_continuum += (wave > continuum_window[window_idx, 0]) & (wave < continuum_window[window_idx, 1])
+
+        # estimate continuum
+        mean_continuum = np.nanmean(flux[mask_continuum])
+        std_continuum = np.nanstd(flux[mask_continuum])
+
+        # we need an estimation for the wavelength bins size now
+        # since the wavelength size does not change much, we can take the mean value
+        wave_comp = wave[mask_line]
+        delta_lambda = np.mean((wave_comp[1:] - wave_comp[:-1]) / 2)
+
+        ew = np.nansum(((mean_continuum - flux[mask_line]) / mean_continuum) * delta_lambda)
+
+        ew_err = np.sqrt((delta_lambda * std_continuum * np.nansum(flux[mask_line]) / (mean_continuum ** 2)) ** 2 +
+                         np.nansum((delta_lambda * flux_err[mask_line] / mean_continuum) ** 2))
+
+        # print('ew, ew_err ', ew, ew_err)
+        # print('mean_continuum ', mean_continuum)
+        # print('std_continuum ', std_continuum)
+
+        # # # plot it to take a look
+        # min_wave = np.min(np.concatenate([wave[mask_continuum], wave[mask_line]])) - 10
+        # max_wave = np.max(np.concatenate([wave[mask_continuum], wave[mask_line]])) + 10
+        #
+        # min_flux = np.min(np.concatenate([flux[mask_continuum], flux[mask_line]]))
+        # max_flux = np.max(np.concatenate([flux[mask_continuum], flux[mask_line]]))
+        #
+        # plt.step(wave, flux, where='mid', color='k')
+        # plt.fill_between(wave[mask_line], flux[mask_line], mean_continuum, color='tab:blue')
+        # plt.plot([np.min(wave[mask_continuum]), np.max(wave[mask_continuum])], [mean_continuum, mean_continuum], color='tab:orange')
+        # # plt.fill_between(wave[mask_continuum], flux[mask_continuum], color='tab:orange')
+        # plt.xlim(min_wave, max_wave)
+        # plt.ylim(min_flux, max_flux)
+        # plt.show()
+
+        return_dict = {'mask_continuum': mask_continuum, 'mask_line': mask_line, 'ew': ew, 'ew_err': ew_err,
+                       'mean_continuum': mean_continuum, 'std_continuum': std_continuum
+        }
+
+        return return_dict
+
+    @staticmethod
+    def compute_ha_ew(ppxf_dict):
+
+        # print(ppxf_dict)
+
+        balmer_redshift = np.exp(ppxf_dict['balmer_kin_comp'][0] / speed_of_light_kmps) - 1
+
+
+        # calculate line window:
+        ha_continuum_window_left_rest_air = (6475.0, 6540.0)
+        ha_continuum_window_right_rest_air = (6595.0, 6625.0)
+
+        continuum_window = np.array([
+            [ha_continuum_window_left_rest_air[0] * (1 + balmer_redshift),
+             ha_continuum_window_left_rest_air[1] * (1 + balmer_redshift)],
+            [ha_continuum_window_right_rest_air[0] * (1 + balmer_redshift),
+             ha_continuum_window_right_rest_air[1] * (1 + balmer_redshift)]
+        ])
+
+        h_alpha_rest_air = 6562.819
+        observed_h_alpha = h_alpha_rest_air * (1 + balmer_redshift)
+
+        observed_sigma_h_alpha = (ppxf_dict['balmer_kin_comp'][1] / speed_of_light_kmps) * h_alpha_rest_air
+        observed_sigma_h_alpha = np.sqrt(observed_sigma_h_alpha ** 2 + get_MUSE_polyFWHM(observed_h_alpha))
+
+        line_window = np.array([observed_h_alpha - 3 * observed_sigma_h_alpha,
+                                observed_h_alpha + 3 * observed_sigma_h_alpha])
+
+        ew_ha, ew_err_ha = SpecTools.compute_ew(wave=ppxf_dict['wavelength'], flux=ppxf_dict['total_flux'],
+                             flux_err=ppxf_dict['total_flux_err'],
+                             line_window=line_window, continuum_window=continuum_window)
+        print('ew_ha, ew_err_ha ', ew_ha, ew_err_ha)
+
+
+
+
+        exit()
+
+
+    @staticmethod
+    def fit_ppxf2spec(spec_dict, target, sps_name='fsps', age_range=None, metal_range=None):
         """
 
         Parameters
@@ -165,25 +270,13 @@ class SpecTools:
         sps_name : str
             can be fsps, galaxev or emiles
 
-
-
         Returns
         -------
         dict
         """
 
-        if ln_list is None:
-            ln_list = [4863, 4960, 5008, 6302, 6550, 6565, 6585, 6718, 6733]
-            # ln_list = [5008, 6550, 6565, 6585]
-
-
-
-        # spec_dict['spec_flux'] *= 1e-20
-        # spec_dict['spec_flux_err'] *= 1e-20
-        #
-        flx = spec_dict['spec_flux'] * 1e-20
-        flx_err = spec_dict['spec_flux_err'] * 1e-20
-
+        flx = spec_dict['spec_flux']
+        flx_err = spec_dict['spec_flux_err']
 
         velscale = speed_of_light_kmps * np.diff(np.log(spec_dict['lam'][-2:]))[0]  # Smallest velocity step
         # print('velscale ', velscale)
@@ -255,7 +348,7 @@ class SpecTools:
         ages, met = sps.mean_age_metal(light_weights)
         mass2light = sps.mass_to_light(light_weights, redshift=redshift)
 
-        wavelength = pp.lam
+        wave = pp.lam
         total_flux = pp.galaxy
         total_flux_err = pp.noise
 
@@ -263,164 +356,79 @@ class SpecTools:
         gas_best_fit = pp.gas_bestfit
         continuum_best_fit = best_fit - gas_best_fit
 
-        em_flux = total_flux - continuum_best_fit
-
-        # now fit the emission lines
-        em_fit_dict = SpecTools.fit_em_lines2spec(ln_list=ln_list, target=target, wave=wavelength,
-                                    em_flux=em_flux, em_flux_err=total_flux_err,
-                                    n_nl_gauss=n_nl_gauss, n_nl_lorentz=n_nl_lorentz, n_bl_gauss=n_bl_gauss,
-                                    x_data_format='wave', instrument='muse', blue_limit=30., red_limit=30.,
-                                                  search_outflow=search_outflow,
-                                                  outflow_shift=outflow_shift, outflow_mu_offset=outflow_mu_offset,
-                                                  outflow_sig=outflow_sig,
-                                                  init_mu_nl_gauss=init_mu_nl_gauss, init_sig_nl_gauss=init_sig_nl_gauss
-        )
-
         # get velocity of balmer component
         sol_kin_comp = pp.sol[0]
         balmer_kin_comp = pp.sol[1]
         forbidden_kin_comp = pp.sol[2]
 
-        h_beta_rest_air = 4861.333
-        h_alpha_rest_air = 6562.819
-        ha_continuum_window_left_rest_air = (6475.0, 6540.0)
-        ha_continuum_window_right_rest_air = (6595.0, 6625.0)
-
-        balmer_redshift = np.exp(balmer_kin_comp[0] / speed_of_light_kmps) - 1
-
-        observed_h_beta = h_beta_rest_air * (1 + balmer_redshift)
-        observed_h_alpha = h_alpha_rest_air * (1 + balmer_redshift)
-
-        observed_sigma_h_alpha = (balmer_kin_comp[1] / speed_of_light_kmps) * h_alpha_rest_air
-        observed_sigma_h_alpha = np.sqrt(observed_sigma_h_alpha ** 2 + get_MUSE_polyFWHM(observed_h_alpha))
-        observed_sigma_h_beta = (balmer_kin_comp[1] / speed_of_light_kmps) * h_beta_rest_air
-        observed_sigma_h_beta = np.sqrt(observed_sigma_h_beta ** 2 + get_MUSE_polyFWHM(observed_h_beta))
-
-        mask_ha = (wavelength > (observed_h_alpha - 3 * observed_sigma_h_alpha)) & (
-                wavelength < (observed_h_alpha + 3 * observed_sigma_h_alpha))
-        mask_hb = (wavelength > (observed_h_beta - 3 * observed_sigma_h_beta)) & (
-                wavelength < (observed_h_beta + 3 * observed_sigma_h_beta))
-        # get ha component
-        ha_line_comp = (total_flux - continuum_best_fit)[mask_ha]
-        ha_line_comp_err = total_flux_err[mask_ha]
-
-        # get the continuum component as a constant
-        mask_cont_region = (((wavelength > (ha_continuum_window_left_rest_air[0] * (1 + balmer_redshift))) &
-                            (wavelength < (ha_continuum_window_left_rest_air[1] * (1 + balmer_redshift)))) |
-                            ((wavelength > (ha_continuum_window_right_rest_air[0] * (1 + balmer_redshift))) &
-                             (wavelength < (ha_continuum_window_right_rest_air[1] * (1 + balmer_redshift)))))
-
-        ha_cont_comp = np.nanmean(continuum_best_fit[mask_cont_region])
-        ha_cont_comp_std = np.nanstd(continuum_best_fit[mask_cont_region])
-
-
-        # since the wavelength size does not change much, we take the mean value
-        ha_wave_comp = wavelength[mask_ha]
-        delta_lambda_ha = np.mean((ha_wave_comp[1:] - ha_wave_comp[:-1]) / 2)
-
-        # calculate the EW
-        ha_ew = np.sum(((ha_cont_comp - ha_line_comp) / ha_cont_comp) * delta_lambda_ha)
-
-        # uncertainty
-        sigma_ew_segment = np.sqrt(((delta_lambda_ha * ha_line_comp_err) / ha_cont_comp)**2 +
-                                   ((ha_line_comp * delta_lambda_ha * ha_cont_comp_std) / (ha_cont_comp ** 2)) ** 2)
-        ha_ew_err = np.sqrt(np.sum(sigma_ew_segment ** 2))
-
-
-        hb_line_comp = (total_flux - continuum_best_fit)[mask_hb]
-        hb_cont_comp = continuum_best_fit[mask_hb]
-        hb_wave_comp = wavelength[mask_hb]
-        delta_lambda_hb = np.mean((hb_wave_comp[1:] - hb_wave_comp[:-1]) / 2)
-        hb_ew = np.sum(((hb_cont_comp - hb_line_comp) / hb_cont_comp) * delta_lambda_hb)
-
-        # gas_phase_metallicity
-        flux_ha = pp.gas_flux[pp.gas_names == 'Halpha']
-        flux_hb = pp.gas_flux[pp.gas_names == 'Hbeta']
-        flux_nii = pp.gas_flux[pp.gas_names == '[OIII]5007_d']
-        flux_oiii = pp.gas_flux[pp.gas_names == '[NII]6583_d']
-
-        # pp.plot()
-
-        o3n2 = np.log10((flux_oiii / flux_hb) / (flux_nii / flux_ha))
-        gas_phase_met = 8.73 - 0.32 * o3n2[0]
-        # plt.plot(hb_wave_comp, hb_line_comp)
-        # plt.plot(hb_wave_comp, hb_cont_comp)
-        # plt.show()
-        # exit()
-        #
-        # # exit()
-        # plt.errorbar(wavelength, total_flux, yerr=total_flux_err)
-        # plt.plot(wavelength, continuum_best_fit)
-        # plt.scatter(wavelength[left_idx_ha[0][0]], continuum_best_fit[left_idx_ha[0][0]])
-        # plt.scatter(wavelength[right_idx_ha[0][0]], continuum_best_fit[right_idx_ha[0][0]])
-        # plt.plot(wavelength, continuum_best_fit + gas_best_fit)
-        # plt.plot(wavelength, gas_best_fit)
-        # plt.plot([observed_nii_1, observed_nii_1], [np.min(total_flux), np.max(total_flux)])
-        # plt.plot([observed_h_alpha, observed_h_alpha], [np.min(total_flux), np.max(total_flux)])
-        # plt.plot([observed_nii_2, observed_nii_2], [np.min(total_flux), np.max(total_flux)])
-        # plt.show()
-        #
-        # plt.figure(figsize=(17, 6))
-        # plt.subplot(111)
-        # pp.plot()
-        # plt.show()
-
         ppxf_dict = {
-            'wavelength': wavelength, 'total_flux': total_flux, 'total_flux_err': total_flux_err,
+            'wave': wave, 'total_flux': total_flux, 'total_flux_err': total_flux_err,
             'best_fit': best_fit, 'gas_best_fit': gas_best_fit, 'continuum_best_fit': continuum_best_fit,
             'ages': ages, 'met': met, 'mass2light': mass2light,
             'pp': pp,
             'star_red': pp.dust[0]['sol'][0], 'gas_red': pp.dust[1]['sol'][0],
             'sol_kin_comp': sol_kin_comp, 'balmer_kin_comp': balmer_kin_comp, 'forbidden_kin_comp': forbidden_kin_comp,
-            'ha_ew': ha_ew, 'ha_ew_err': ha_ew_err, 'hb_ew': hb_ew, 'gas_phase_met': gas_phase_met,
-            'sys_vel': sys_vel, 'redshift': redshift
+            'sys_vel': sys_vel, 'redshift': redshift, 'rad_arcsec': spec_dict['rad_arcsec']
         }
-        return ppxf_dict, em_fit_dict
+
+        return ppxf_dict
+
+
 
     @staticmethod
-    def get_line_mask(wave, line, target, instrument='muse', blue_limit=30., red_limit=30.):
+    def get_line_mask(wave, line, vel_kmps, target, instrument='muse', blue_limit=30., red_limit=30.):
         if line in (6550, 6565, 6585):
-            nii_6550_observed_line = SpecTools.get_line_pos(line=6550, target=target, instrument=instrument)
-            nii_6585_observed_line = SpecTools.get_line_pos(line=6585, target=target, instrument=instrument)
+            nii_6550_observed_line = SpecTools.get_line_pos(line=6550, vel_kmps=vel_kmps, target=target, instrument=instrument)
+            nii_6585_observed_line = SpecTools.get_line_pos(line=6585, vel_kmps=vel_kmps, target=target, instrument=instrument)
             return (wave > (nii_6550_observed_line - blue_limit)) & \
                    (wave < nii_6585_observed_line + red_limit)
         elif line in (6718, 6733):
-            sii_6718_observed_line = SpecTools.get_line_pos(line=6718, target=target, instrument=instrument)
-            sii_6733_observed_line = SpecTools.get_line_pos(line=6733, target=target, instrument=instrument)
+            sii_6718_observed_line = SpecTools.get_line_pos(line=6718, vel_kmps=vel_kmps, target=target, instrument=instrument)
+            sii_6733_observed_line = SpecTools.get_line_pos(line=6733, vel_kmps=vel_kmps, target=target, instrument=instrument)
             return (wave > (sii_6718_observed_line - blue_limit)) & \
                    (wave < sii_6733_observed_line + red_limit)
         else:
-            obs_line = SpecTools.get_line_pos(line=line, target=target, instrument=instrument)
+            obs_line = SpecTools.get_line_pos(line=line, vel_kmps=vel_kmps, target=target, instrument=instrument)
             return (wave > (obs_line - blue_limit)) & \
                    (wave < obs_line + red_limit)
 
     @staticmethod
-    def get_multiple_line_mask(wave, ln_list, target, instrument='muse', blue_limit=30., red_limit=30.):
+    def get_multiple_line_mask(wave, ln_list, vel_kmps, target, instrument='muse', blue_limit=30., red_limit=30.):
 
         multi_line_mask = np.zeros(len(wave), dtype=bool)
         if ln_list is None:
             ln_list = [4863, 4960, 5008, 6302, 6550, 6565, 6585, 6718, 6733]
 
         for line in ln_list:
-            multi_line_mask += SpecTools.get_line_mask(wave=wave, line=line, target=target, instrument=instrument,
+            multi_line_mask += SpecTools.get_line_mask(wave=wave, line=line, vel_kmps=vel_kmps, target=target, instrument=instrument,
                                                    blue_limit=blue_limit, red_limit=red_limit)
 
         return multi_line_mask
 
 
     @staticmethod
-    def fit_em_lines2spec(ln_list, target, wave, em_flux, em_flux_err, n_nl_gauss=1, n_nl_lorentz=0, n_bl_gauss=0,
+    def fit_em_lines2spec(target, wave, em_flux, em_flux_err, sys_vel=None, ln_list=None, n_nl_gauss=1, n_nl_lorentz=0, n_bl_gauss=0,
                           x_data_format='wave', instrument='muse', blue_limit=30., red_limit=30., search_outflow=True,
-                          outflow_shift='redshift', outflow_mu_offset=400,outflow_sig=1200,
-                          init_mu_nl_gauss=100, init_sig_nl_gauss=200
+                          outflow_shift='redshift', outflow_mu_offset=400, outflow_sig=1200,
+                          init_mu_nl_gauss=100, init_sig_nl_gauss=200):
 
-    ):
+        if ln_list is None:
+            ln_list = [4863, 4960, 5008, 6550, 6565, 6585, 6718, 6733]
+            # ln_list = [6718, 6733]
+
+        if sys_vel is None:
+            sys_vel = SpecTools.get_target_sys_vel(target=target)
+        print('sys_vel ', sys_vel)
         # get data
-        ln_mask = SpecTools.get_multiple_line_mask(wave=wave, ln_list=ln_list, target=target, instrument=instrument,
+        ln_mask = SpecTools.get_multiple_line_mask(wave=wave, ln_list=ln_list, vel_kmps=sys_vel, target=target, instrument=instrument,
                                                  blue_limit=blue_limit, red_limit=red_limit)
-        # get systematic velocity
-        sys_vel = SpecTools.get_target_sys_vel(target=target)
 
+        # plt.close()
+        # plt.plot(wave[ln_mask], em_flux[ln_mask])
+        # plt.show()
+        # exit()
+
+        # get systematic velocity
         dict_inst_broad = {}
         for line in ln_list:
             dict_inst_broad.update(
@@ -437,11 +445,13 @@ class SpecTools:
                                                                  n_nl_lorentz=n_nl_lorentz, n_bl_gauss=n_bl_gauss,
                                                                  balmer_ln=fit_model.balmer_ln, all_ln=fit_model.all_ln,
                                                                  wave=wave, em_flux=em_flux,
+                                                                 sys_vel=sys_vel,
                                                                  instrument=instrument,
                                                                  search_outflow=search_outflow,
                                                                  outflow_shift=outflow_shift, outflow_mu_offset=outflow_mu_offset,outflow_sig=outflow_sig,
                                                                  init_mu_nl_gauss=init_mu_nl_gauss,  init_sig_nl_gauss=init_sig_nl_gauss
                                                                  )
+        print(fit_param_restrict_dict_nl_gauss)
 
         fit_param_dict = fit_model.run_fit(fit_param_restrict_dict_nl_gauss=fit_param_restrict_dict_nl_gauss,
                                       fit_param_restrict_dict_nl_lorentz=fit_param_restrict_dict_nl_lorentz,
@@ -472,13 +482,17 @@ class SpecTools:
 
 
     @staticmethod
-    def get_fit_param_restrict_dict_outflow_search(target, n_nl_gauss, n_nl_lorentz, n_bl_gauss, balmer_ln, all_ln,
-                                                   wave, em_flux, instrument='muse',
+    def get_fit_param_restrict_dict_outflow_search(target,
+
+                                                   n_nl_gauss, n_nl_lorentz, n_bl_gauss, balmer_ln, all_ln,
+                                                   wave, em_flux,
+                                                   sys_vel=None,
+                                                   instrument='muse',
                                                    search_outflow=True,
                                                    outflow_shift='blueshift', outflow_mu_offset=0,outflow_sig=1200,
-                                     init_amp_nl_gauss_frac=1, lower_rel_amp_nl_gauss=0, upper_rel_amp_nl_gauss=2,
+                                     init_amp_nl_gauss_frac=1, lower_rel_amp_nl_gauss=0.0, upper_rel_amp_nl_gauss=2,
                                      amp_nl_gauss_floating=True,
-                                     init_mu_nl_gauss=200, lower_mu_nl_gauss=-1000, upper_mu_nl_gauss=1000,
+                                     init_mu_nl_gauss=200, lower_mu_nl_gauss=-500, upper_mu_nl_gauss=500,
                                      mu_nl_gauss_floating=True,
                                      init_sig_nl_gauss=100, lower_sig_nl_gauss=0, upper_sig_nl_gauss=700,
                                      sig_nl_gauss_floating=True,
@@ -544,7 +558,8 @@ class SpecTools:
 
         """
         # get systematic velocity
-        sys_vel = SpecTools.get_target_sys_vel(target=target)
+        if sys_vel is None:
+            sys_vel = SpecTools.get_target_sys_vel(target=target)
 
         # create the empty parameter dict
         fit_param_restrict_dict_nl_gauss = {}
@@ -701,21 +716,17 @@ class SpecTools:
                                                               'sig_floating': sig_nl_gauss_floating[gauss_index]}})
             # add amplitude paramaeters
             for line in all_ln:
-                if gauss_index == 0:
-                    if line == 5008:
-                        init_amp = SpecTools.estimate_line_amp(line=line, wave=wave, em_flux=em_flux, target=target, instrument=instrument, bin_rad=4) * 0.4
-                    else:
-                        init_amp = SpecTools.estimate_line_amp(line=line, wave=wave, em_flux=em_flux, target=target, instrument=instrument, bin_rad=4) * 0.01
-                else:
-                    init_amp = SpecTools.estimate_line_amp(line=line, wave=wave, em_flux=em_flux, target=target, instrument=instrument, bin_rad=4) * init_amp_nl_gauss_frac[gauss_index]
+                # if gauss_index == 0:
+                #     if line == 5008:
+                #         init_amp = SpecTools.estimate_line_amp(line=line, wave=wave, em_flux=em_flux, target=target, instrument=instrument, bin_rad=4) * 0.4
+                #     else:
+                #         init_amp = SpecTools.estimate_line_amp(line=line, wave=wave, em_flux=em_flux, target=target, instrument=instrument, bin_rad=4) * 0.01
+                # else:
+                init_amp = SpecTools.estimate_line_amp(line=line, wave=wave, em_flux=em_flux, target=target, instrument=instrument, bin_rad=4) * init_amp_nl_gauss_frac[gauss_index]
                 fit_param_restrict_dict_nl_gauss['nl_gauss_%i' % gauss_index].update({
                     'amp_%i' % line: init_amp,
-                    'lower_amp_%i' % line:
-                        SpecTools.estimate_line_amp(line=line, wave=wave, em_flux=em_flux, target=target, instrument=instrument, bin_rad=4) *
-                        lower_rel_amp_nl_gauss[gauss_index],
-                    'upper_amp_%i' % line:
-                        SpecTools.estimate_line_amp(line=line, wave=wave, em_flux=em_flux, target=target, instrument=instrument, bin_rad=4) *
-                        upper_rel_amp_nl_gauss[gauss_index],
+                    'lower_amp_%i' % line: init_amp * lower_rel_amp_nl_gauss[gauss_index],
+                    'upper_amp_%i' % line: init_amp * upper_rel_amp_nl_gauss[gauss_index],
                     'amp_floating_%i' % line: amp_nl_gauss_floating[gauss_index]
                 })
 
@@ -771,7 +782,281 @@ class SpecTools:
 
         return fit_param_restrict_dict_nl_gauss, fit_param_restrict_dict_nl_lorentz, fit_param_restrict_dict_bl_gauss
 
+    @staticmethod
+    def fit_nad_line(ppxf_fit_dict, em_line_fit_dict, target):
 
+        line_1 = 5892
+        line_2 = 5898
+
+        # now get the absorption line position
+        line_mask = SpecTools.get_multiple_line_mask(wave=ppxf_fit_dict['wave'],
+                                               ln_list=[5892, 5898],
+                                               vel_kmps=ppxf_fit_dict['sol_kin_comp'][0],
+                                               target=target, instrument='muse', blue_limit=30., red_limit=50.)
+
+        plt.plot(ppxf_fit_dict['wave'][line_mask], ppxf_fit_dict['total_flux'][line_mask])
+        plt.show()
+
+
+
+    @staticmethod
+    def measure_caii_triplet(ppxf_fit_dict, plot_results=True):
+        line_caii_1 = 8500
+        line_caii_2 = 8544
+        line_caii_3 = 8665
+
+        line_pos_caii_1 = SpecTools.get_line_pos(line=line_caii_1, vel_kmps=ppxf_fit_dict['sol_kin_comp'][0],
+                                                 target=None, redshift=None, instrument='muse')
+        line_pos_caii_2 = SpecTools.get_line_pos(line=line_caii_2, vel_kmps=ppxf_fit_dict['sol_kin_comp'][0],
+                                                 target=None, redshift=None, instrument='muse')
+        line_pos_caii_3 = SpecTools.get_line_pos(line=line_caii_3, vel_kmps=ppxf_fit_dict['sol_kin_comp'][0],
+                                                 target=None, redshift=None, instrument='muse')
+        # get the sizes of absorption lines
+        sig_int_vel = ppxf_fit_dict['sol_kin_comp'][1]
+        # we will calculate the sizes with the middle line since this will not change too much over this region
+        # get instrumental broadening
+        sig_inst_broad_vel = SpecTools.get_inst_broad_sig(line=line_caii_2, instrument='muse', unit='kmps')
+        sig_obs_vel = np.sqrt(sig_int_vel ** 2 + sig_inst_broad_vel ** 2)
+        sig_obs_wave = SpecTools.conv_vel2delta_wave(line=line_caii_2, vel=sig_obs_vel, vel_unit='kmps', line_ref='vac_wave')
+
+
+        mask_abs_caii_1 = ((ppxf_fit_dict['wave'] > line_pos_caii_1 - 3 * sig_obs_wave) &
+                           (ppxf_fit_dict['wave'] < line_pos_caii_1 + 3 * sig_obs_wave))
+        mask_abs_caii_2 = ((ppxf_fit_dict['wave'] > line_pos_caii_2 - 3 * sig_obs_wave) &
+                           (ppxf_fit_dict['wave'] < line_pos_caii_2 + 3 * sig_obs_wave))
+        mask_abs_caii_3 = ((ppxf_fit_dict['wave'] > line_pos_caii_3 - 3 * sig_obs_wave) &
+                           (ppxf_fit_dict['wave'] < line_pos_caii_3 + 3 * sig_obs_wave))
+
+
+        line_window_caii_1 = (line_pos_caii_1 - 3 * sig_obs_wave, line_pos_caii_1 + 3 * sig_obs_wave)
+        line_window_caii_2 = (line_pos_caii_2 - 3 * sig_obs_wave, line_pos_caii_2 + 3 * sig_obs_wave)
+        line_window_caii_3 = (line_pos_caii_3 - 3 * sig_obs_wave, line_pos_caii_3 + 3 * sig_obs_wave)
+
+
+        continuum_window_caii = np.array([[line_pos_caii_1 - 5 * sig_obs_wave - 50, line_pos_caii_1 - 5 * sig_obs_wave],
+                                          [line_pos_caii_1 + 5 * sig_obs_wave, line_pos_caii_2 - 5 * sig_obs_wave],
+                                          [line_pos_caii_2 + 5 * sig_obs_wave, line_pos_caii_3 - 5 * sig_obs_wave],
+                                          [line_pos_caii_3 + 5 * sig_obs_wave, line_pos_caii_3 + 5 * sig_obs_wave + 50]
+                                          ])
+
+
+        ew_dict_caii_1 = SpecTools.compute_ew(wave=ppxf_fit_dict['wave'], flux=ppxf_fit_dict['total_flux'],
+                                                        flux_err=ppxf_fit_dict['total_flux_err'],
+                                                        line_window=line_window_caii_1,
+                                                        continuum_window=continuum_window_caii)
+
+        ew_dict_caii_2 = SpecTools.compute_ew(wave=ppxf_fit_dict['wave'], flux=ppxf_fit_dict['total_flux'],
+                                                        flux_err=ppxf_fit_dict['total_flux_err'],
+                                                        line_window=line_window_caii_2,
+                                                        continuum_window=continuum_window_caii)
+
+        ew_dict_caii_3 = SpecTools.compute_ew(wave=ppxf_fit_dict['wave'], flux=ppxf_fit_dict['total_flux'],
+                                                        flux_err=ppxf_fit_dict['total_flux_err'],
+                                                        line_window=line_window_caii_3,
+                                                        continuum_window=continuum_window_caii)
+
+
+        # print('ew_caii_1, ew_err_caii_1 ', ew_dict_caii_1['ew'], ew_dict_caii_1['ew_err'])
+        # print('ew_caii_2, ew_err_caii_2 ', ew_dict_caii_2['ew'], ew_dict_caii_2['ew_err'])
+        # print('ew_caii_3, ew_err_caii_3 ', ew_dict_caii_3['ew'], ew_dict_caii_3['ew_err'])
+
+
+        return_dict = {
+            'ew_caii_1': ew_dict_caii_1['ew'],
+            'ew_err_caii_1': ew_dict_caii_1['ew_err'],
+            'ew_caii_2': ew_dict_caii_2['ew'],
+            'ew_err_caii_2': ew_dict_caii_2['ew_err'],
+            'ew_caii_3': ew_dict_caii_3['ew'],
+            'ew_err_caii_3': ew_dict_caii_3['ew_err']
+        }
+
+
+
+        # # now get the absorption line position
+        spec_part_mask = SpecTools.get_multiple_line_mask(wave=ppxf_fit_dict['wave'],
+                                               ln_list=[line_caii_1, line_caii_2, line_caii_3],
+                                               vel_kmps=ppxf_fit_dict['sol_kin_comp'][0],
+                                               target=None, instrument='muse', blue_limit=70., red_limit=70.)
+
+        mask_continuum = SpecTools.wave_window2mask(wave=ppxf_fit_dict['wave'], wave_window=continuum_window_caii)
+
+        # fit three gaussians to get the sizes
+
+        if plot_results:
+            fig, ax = plt.subplots(figsize=(20, 14))
+            fontsize = 23
+
+            flux_min = np.min(ppxf_fit_dict['total_flux'][spec_part_mask])
+            flux_max = np.max(ppxf_fit_dict['total_flux'][spec_part_mask])
+
+
+            ax.step(ppxf_fit_dict['wave'][spec_part_mask], ppxf_fit_dict['total_flux'][spec_part_mask], where='mid', color='k')
+
+            ax.plot([np.min(ppxf_fit_dict['wave'][spec_part_mask]), np.max(ppxf_fit_dict['wave'][spec_part_mask])],
+                     [ew_dict_caii_1['mean_continuum'], ew_dict_caii_1['mean_continuum']], color='tab:blue')
+            ax.plot([np.min(ppxf_fit_dict['wave'][spec_part_mask]), np.max(ppxf_fit_dict['wave'][spec_part_mask])],
+                     [ew_dict_caii_2['mean_continuum']-ew_dict_caii_2['std_continuum'], ew_dict_caii_1['mean_continuum']-ew_dict_caii_1['std_continuum']], color='tab:blue', linestyle='--')
+            ax.plot([np.min(ppxf_fit_dict['wave'][spec_part_mask]), np.max(ppxf_fit_dict['wave'][spec_part_mask])],
+                     [ew_dict_caii_3['mean_continuum']+ew_dict_caii_3['std_continuum'], ew_dict_caii_1['mean_continuum']+ew_dict_caii_1['std_continuum']], color='tab:blue', linestyle='--')
+
+            ax.scatter(ppxf_fit_dict['wave'][mask_continuum], ppxf_fit_dict['total_flux'][mask_continuum], color='tab:red')
+
+            ax.fill_between(ppxf_fit_dict['wave'][mask_abs_caii_1], ppxf_fit_dict['total_flux'][mask_abs_caii_1], ew_dict_caii_1['mean_continuum'], color='gray', alpha=0.5)
+            ax.fill_between(ppxf_fit_dict['wave'][mask_abs_caii_2], ppxf_fit_dict['total_flux'][mask_abs_caii_2], ew_dict_caii_2['mean_continuum'], color='gray', alpha=0.5)
+            ax.fill_between(ppxf_fit_dict['wave'][mask_abs_caii_3], ppxf_fit_dict['total_flux'][mask_abs_caii_3], ew_dict_caii_3['mean_continuum'], color='gray', alpha=0.5)
+
+            ax.set_ylim(flux_min - (flux_max - flux_min) * 0.2, flux_max + (flux_max - flux_min) * 0.1)
+
+            ax.text(line_pos_caii_1, np.min(ppxf_fit_dict['total_flux'][mask_abs_caii_1]) - (flux_max - flux_min) * 0.02,
+                    phys_params.opt_line_wave[line_caii_1]['plot_name'] + ' \n' + r'EW = %.2f $\pm$ %.2f ${\rm \AA}$' % (ew_dict_caii_1['ew'], ew_dict_caii_1['ew_err']),
+                    ha='center', va='top', fontsize=fontsize)
+
+            ax.text(line_pos_caii_2, np.min(ppxf_fit_dict['total_flux'][mask_abs_caii_2]) - (flux_max - flux_min) * 0.02,
+                    phys_params.opt_line_wave[line_caii_2]['plot_name'] + ' \n' + r'EW = %.2f $\pm$ %.2f ${\rm \AA}$' % (ew_dict_caii_2['ew'], ew_dict_caii_2['ew_err']),
+                    ha='center', va='top', fontsize=fontsize)
+
+            ax.text(line_pos_caii_3, np.min(ppxf_fit_dict['total_flux'][mask_abs_caii_3]) - (flux_max - flux_min) * 0.02,
+                    phys_params.opt_line_wave[line_caii_3]['plot_name'] + ' \n' + r'EW = %.2f $\pm$ %.2f ${\rm \AA}$' % (ew_dict_caii_3['ew'], ew_dict_caii_3['ew_err']),
+                    ha='center', va='top', fontsize=fontsize)
+
+            ax.tick_params(axis='both', which='both', width=2, length=10, right=True, top=True, direction='in',
+                               labelsize=fontsize)
+
+            ax.set_xlabel(r'Wavelength [${\rm \AA}$]', fontsize=fontsize)
+            ax.set_ylabel(r'$\phi$ [erg cm$^{-2}$ s$^{-1}$ ${\rm \AA^{-1}}$]', fontsize=fontsize)
+
+            # plt.show()
+
+            return return_dict, fig
+        else:
+            return return_dict, None
+
+    @staticmethod
+    def fit_complete_spec_old(spec_dict, target, sps_name='fsps', age_range=None, metal_range=None, ln_list=None,
+                      n_nl_gauss=1, n_nl_lorentz=0, n_bl_gauss=0, search_outflow=False,
+                      outflow_shift='redshift', outflow_mu_offset=400,outflow_sig=1200,
+                      init_mu_nl_gauss=100,  init_sig_nl_gauss=200):
+
+        # first fit ppxf
+        ppxf_dict = SpecTools.fit_ppxf2spec(
+            spec_dict=spec_dict, target=target, sps_name=sps_name, age_range=age_range, metal_range=metal_range,
+            ln_list=ln_list, n_nl_gauss=n_nl_gauss, n_nl_lorentz=n_nl_lorentz, n_bl_gauss=n_bl_gauss,
+            search_outflow=search_outflow, outflow_shift=outflow_shift, outflow_mu_offset=outflow_mu_offset,
+            outflow_sig=outflow_sig, init_mu_nl_gauss=init_mu_nl_gauss, init_sig_nl_gauss=init_sig_nl_gauss)
+
+        if ln_list is None:
+            ln_list = [4863, 4960, 5008, 6302, 6550, 6565, 6585, 6718, 6733]
+            # ln_list = [5008, 6550, 6565, 6585]
+
+
+        # now fit the emission lines
+        em_line_fit_dict = SpecTools.fit_em_lines2spec(ln_list=ln_list, target=target, wave=wavelength,
+                                                  em_flux=em_flux, em_flux_err=total_flux_err,
+                                                  n_nl_gauss=n_nl_gauss, n_nl_lorentz=n_nl_lorentz,
+                                                  n_bl_gauss=n_bl_gauss,
+                                                  x_data_format='wave', instrument='muse', blue_limit=30.,
+                                                  red_limit=30.,
+                                                  search_outflow=search_outflow,
+                                                  outflow_shift=outflow_shift, outflow_mu_offset=outflow_mu_offset,
+                                                  outflow_sig=outflow_sig,
+                                                  init_mu_nl_gauss=init_mu_nl_gauss, init_sig_nl_gauss=init_sig_nl_gauss
+                                                  )
+
+
+
+        h_beta_rest_air = 4861.333
+        h_alpha_rest_air = 6562.819
+        ha_continuum_window_left_rest_air = (6475.0, 6540.0)
+        ha_continuum_window_right_rest_air = (6595.0, 6625.0)
+
+        balmer_redshift = np.exp(balmer_kin_comp[0] / speed_of_light_kmps) - 1
+
+        observed_h_beta = h_beta_rest_air * (1 + balmer_redshift)
+        observed_h_alpha = h_alpha_rest_air * (1 + balmer_redshift)
+
+        observed_sigma_h_alpha = (balmer_kin_comp[1] / speed_of_light_kmps) * h_alpha_rest_air
+        observed_sigma_h_alpha = np.sqrt(observed_sigma_h_alpha ** 2 + get_MUSE_polyFWHM(observed_h_alpha))
+        observed_sigma_h_beta = (balmer_kin_comp[1] / speed_of_light_kmps) * h_beta_rest_air
+        observed_sigma_h_beta = np.sqrt(observed_sigma_h_beta ** 2 + get_MUSE_polyFWHM(observed_h_beta))
+
+        mask_ha = (wavelength > (observed_h_alpha - 3 * observed_sigma_h_alpha)) & (
+                wavelength < (observed_h_alpha + 3 * observed_sigma_h_alpha))
+        mask_hb = (wavelength > (observed_h_beta - 3 * observed_sigma_h_beta)) & (
+                wavelength < (observed_h_beta + 3 * observed_sigma_h_beta))
+        # get ha component
+        ha_line_comp = (total_flux - continuum_best_fit)[mask_ha]
+        ha_line_comp_err = total_flux_err[mask_ha]
+
+        # get the continuum component as a constant
+        mask_cont_region = (((wavelength > (ha_continuum_window_left_rest_air[0] * (1 + balmer_redshift))) &
+                             (wavelength < (ha_continuum_window_left_rest_air[1] * (1 + balmer_redshift)))) |
+                            ((wavelength > (ha_continuum_window_right_rest_air[0] * (1 + balmer_redshift))) &
+                             (wavelength < (ha_continuum_window_right_rest_air[1] * (1 + balmer_redshift)))))
+
+        ha_cont_comp = np.nanmean(continuum_best_fit[mask_cont_region])
+        ha_cont_comp_std = np.nanstd(continuum_best_fit[mask_cont_region])
+
+        # since the wavelength size does not change much, we take the mean value
+        ha_wave_comp = wavelength[mask_ha]
+        delta_lambda_ha = np.mean((ha_wave_comp[1:] - ha_wave_comp[:-1]) / 2)
+
+        # calculate the EW
+        ha_ew = np.sum(((ha_cont_comp - ha_line_comp) / ha_cont_comp) * delta_lambda_ha)
+
+        # uncertainty
+        sigma_ew_segment = np.sqrt(((delta_lambda_ha * ha_line_comp_err) / ha_cont_comp) ** 2 +
+                                   ((ha_line_comp * delta_lambda_ha * ha_cont_comp_std) / (ha_cont_comp ** 2)) ** 2)
+        ha_ew_err = np.sqrt(np.sum(sigma_ew_segment ** 2))
+
+        hb_line_comp = (total_flux - continuum_best_fit)[mask_hb]
+        hb_cont_comp = continuum_best_fit[mask_hb]
+        hb_wave_comp = wavelength[mask_hb]
+        delta_lambda_hb = np.mean((hb_wave_comp[1:] - hb_wave_comp[:-1]) / 2)
+        hb_ew = np.sum(((hb_cont_comp - hb_line_comp) / hb_cont_comp) * delta_lambda_hb)
+
+        # gas_phase_metallicity
+        flux_ha = pp.gas_flux[pp.gas_names == 'Halpha']
+        flux_hb = pp.gas_flux[pp.gas_names == 'Hbeta']
+        flux_nii = pp.gas_flux[pp.gas_names == '[OIII]5007_d']
+        flux_oiii = pp.gas_flux[pp.gas_names == '[NII]6583_d']
+
+        # pp.plot()
+
+        o3n2 = np.log10((flux_oiii / flux_hb) / (flux_nii / flux_ha))
+        gas_phase_met = 8.73 - 0.32 * o3n2[0]
+        # plt.plot(hb_wave_comp, hb_line_comp)
+        # plt.plot(hb_wave_comp, hb_cont_comp)
+        # plt.show()
+        # exit()
+        #
+        # # exit()
+        # plt.errorbar(wavelength, total_flux, yerr=total_flux_err)
+        # plt.plot(wavelength, continuum_best_fit)
+        # plt.scatter(wavelength[left_idx_ha[0][0]], continuum_best_fit[left_idx_ha[0][0]])
+        # plt.scatter(wavelength[right_idx_ha[0][0]], continuum_best_fit[right_idx_ha[0][0]])
+        # plt.plot(wavelength, continuum_best_fit + gas_best_fit)
+        # plt.plot(wavelength, gas_best_fit)
+        # plt.plot([observed_nii_1, observed_nii_1], [np.min(total_flux), np.max(total_flux)])
+        # plt.plot([observed_h_alpha, observed_h_alpha], [np.min(total_flux), np.max(total_flux)])
+        # plt.plot([observed_nii_2, observed_nii_2], [np.min(total_flux), np.max(total_flux)])
+        # plt.show()
+        #
+        # plt.figure(figsize=(17, 6))
+        # plt.subplot(111)
+        # pp.plot()
+        # plt.show()
+
+        ppxf_dict = {
+            'wavelength': wavelength, 'total_flux': total_flux, 'total_flux_err': total_flux_err,
+            'best_fit': best_fit, 'gas_best_fit': gas_best_fit, 'continuum_best_fit': continuum_best_fit,
+            'ages': ages, 'met': met, 'mass2light': mass2light,
+            'pp': pp,
+            'star_red': pp.dust[0]['sol'][0], 'gas_red': pp.dust[1]['sol'][0],
+            'sol_kin_comp': sol_kin_comp, 'balmer_kin_comp': balmer_kin_comp, 'forbidden_kin_comp': forbidden_kin_comp,
+            'ha_ew': ha_ew, 'ha_ew_err': ha_ew_err, 'hb_ew': hb_ew, 'gas_phase_met': gas_phase_met,
+            'sys_vel': sys_vel, 'redshift': redshift
+        }
+        return ppxf_dict, em_line_fit_dict
 
 
 

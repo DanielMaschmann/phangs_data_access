@@ -15,6 +15,7 @@ from photutils.aperture import ApertureStats
 from photutils.aperture import aperture_photometry
 from photutils import background
 from photutils.detection import DAOStarFinder
+from photutils.detection import find_peaks
 
 import astropy.units as u
 from astropy.coordinates import SkyCoord
@@ -245,6 +246,28 @@ class PSFTools:
         return amp * np.exp(-(rad_arcsec - mu) ** 2 / (2 * sig ** 2))
 
     @staticmethod
+    def get_astrosat_psf_fwhm(band):
+        """
+        Parameters
+        ----------
+        band : str
+            ASTROSAT band
+
+
+        Returns
+        -------
+        rad, profile : array-like
+
+        """
+        if band in ['F148W', 'F148W_old', 'F148Wa', 'F154W', 'F154W_old', 'F169M', 'F169M_old', 'F172M', 'F172M_old']:
+            return phys_params.astrosat_psf_fwhm_arcsec['fuv']
+        elif band in ['N219M', 'N219M_old', 'N242W', 'N242W_old', 'N245M', 'N245M_old', 'N263M', 'N263M_old', 'N279N',
+                      'N279N_old']:
+            return phys_params.astrosat_psf_fwhm_arcsec['nuv']
+        else:
+            raise KeyError('this band is not covered for PSF estimation or not an ASTROSAT band')
+
+    @staticmethod
     def load_obs_psf_dict(band, instrument):
         """
         Parameters
@@ -285,6 +308,42 @@ class PSFTools:
         mu = psf_dict['gaussian_mean']
         sig = psf_dict['gaussian_std']
         return amp * np.exp(-(rad_arcsec - mu) ** 2 / (2 * sig ** 2))
+
+
+    @staticmethod
+    def get_psf_gauss_corr_fact(band, instrument, std):
+        # load the EE dict
+        path2psf_data = Path(__file__).parent.parent.resolve() / 'meta_data' / 'psf_data' / 'data_output'
+        if instrument == 'acs':
+            ee_corr_file_name = 'acs_wfc_psf_correction_dict.pickle'
+            used_band = PSFTools.get_closest_available_hst_psf_filter(band=band, instrument=instrument)
+        elif instrument == 'uvis':
+            ee_corr_file_name = 'wfc3_uv_psf_correction_dict.pickle'
+            used_band = PSFTools.get_closest_available_hst_psf_filter(band=band, instrument=instrument)
+        elif instrument == 'ir':
+            ee_corr_file_name = 'wfc3_ir_psf_correction_dict.pickle'
+            used_band = PSFTools.get_closest_available_hst_psf_filter(band=band, instrument=instrument)
+        elif instrument == 'nircam':
+            ee_corr_file_name = 'nircam_psf_correction_dict.pickle'
+            used_band = band
+        elif instrument == 'miri':
+            ee_corr_file_name = 'miri_psf_correction_dict.pickle'
+            used_band = band
+        else:
+            raise KeyError(instrument, ' not understood as instrument keyword')
+
+        # psf_correction_dict = pickle.load(ee_corr_file_name)
+        with open(path2psf_data / ee_corr_file_name, 'rb') as file_name:
+            psf_correction_dict = pickle.load(file_name)
+
+        if std < psf_correction_dict[used_band]['measured_std_values'][0]:
+            return psf_correction_dict[used_band]['measured_ee_value'][0]
+        elif std > psf_correction_dict[used_band]['measured_std_values'][-1]:
+            return psf_correction_dict[used_band]['measured_ee_value'][-1]
+
+        # interpolate the
+        interp_func = interp1d(psf_correction_dict[used_band]['measured_std_values'], psf_correction_dict[used_band]['measured_ee_value'])
+        return interp_func(std)
 
 
 class ProfileTools:
@@ -468,29 +527,7 @@ class ProfileTools:
         return {'rad': rad, 'profile': profile, 'profile_err': profile_err, 'slit_profile_dict': slit_profile_dict}
 
     @staticmethod
-    def get_psf_gauss_corr_fact(band, instrument, std):
-        # load the EE dict
-        if instrument == 'miri':
-            ee_corr_file_name = Path(__file__).parent.parent.resolve() / 'meta_data' / 'psf_data' / 'data_output'/ 'miri_psf_correction_dict.pickle'
-
-        # psf_correction_dict = pickle.load(ee_corr_file_name)
-        with open(ee_corr_file_name, 'rb') as file_name:
-            psf_correction_dict = pickle.load(file_name)
-
-        if std < psf_correction_dict[band]['measured_std_values'][0]:
-            return psf_correction_dict[band]['measured_ee_value'][0]
-        elif std > psf_correction_dict[band]['measured_std_values'][-1]:
-            return psf_correction_dict[band]['measured_ee_value'][-1]
-
-        # interpolate the
-        interp_func = interp1d(psf_correction_dict[band]['measured_std_values'], psf_correction_dict[band]['measured_ee_value'])
-        return interp_func(std)
-
-    @staticmethod
-    def measure_morph_photometry(topo_dict, band, instrument, x_center, ycenter, rad_profile_dict, std_pix,
-                                 upper_sig_fact=10, central_rad_fact=3, model_pos_rad_accept_fact=1,
-                                 n_good_fits_needed=4):
-
+    def fit_gauss2rad_profiles(rad_profile_dict, std_pix, upper_sig_fact=10, central_rad_fact=5, ):
         radius_of_interes = float(std_pix * central_rad_fact)
 
         amp_list = []
@@ -499,19 +536,32 @@ class ProfileTools:
         amp_err_list = []
         mu_err_list = []
         sig_err_list = []
+
         max_amp_value = 0
 
         # import matplotlib.pyplot as plt
         # fig, ax = plt.subplots(nrows=len(rad_profile_dict['list_angle_idx']) +1)
 
-
         for idx in rad_profile_dict['list_angle_idx']:
-
             # plt.plot(rad_profile_dict[str(idx)]['radius_data'], rad_profile_dict[str(idx)]['profile_data'])
             # plt.show()
 
-            mask_pixels_to_fit = ((rad_profile_dict[str(idx)]['radius_data'] > radius_of_interes * -1) &
-                           (rad_profile_dict[str(idx)]['radius_data'] < radius_of_interes) & np.invert(rad_profile_dict[str(idx)]['profile_mask']))
+            central_pix = ((rad_profile_dict[str(idx)]['radius_data'] > radius_of_interes * -1) &
+                           (rad_profile_dict[str(idx)]['radius_data'] < radius_of_interes))
+            good_pix = np.invert(rad_profile_dict[str(idx)]['profile_mask'])
+
+            # there must be at least half of the data points with a signal
+            if sum(good_pix[central_pix]) < int(sum(central_pix) / 2):
+                amp_list.append(np.nan)
+                mu_list.append(np.nan)
+                sig_list.append(np.nan)
+
+                amp_err_list.append(np.nan)
+                mu_err_list.append(np.nan)
+                sig_err_list.append(np.nan)
+                continue
+
+            mask_pixels_to_fit = central_pix * good_pix
             min_value_in_center = np.min(rad_profile_dict[str(idx)]['profile_data'][mask_pixels_to_fit])
             max_value_in_center = np.max(rad_profile_dict[str(idx)]['profile_data'][mask_pixels_to_fit])
             lower_amp = min_value_in_center
@@ -520,7 +570,7 @@ class ProfileTools:
             if max_value_in_center > max_amp_value:
                 max_amp_value = max_value_in_center
 
-            # ax[idx].plot(rad_profile_dict[str(idx)]['radius_data'],
+            # ax[idx].scatter(rad_profile_dict[str(idx)]['radius_data'],
             #              rad_profile_dict[str(idx)]['profile_data'],
             #              color='gray')
             # ax[-1].plot(rad_profile_dict[str(idx)]['radius_data'],
@@ -552,19 +602,17 @@ class ProfileTools:
                 lower_mu=std_pix * -5, upper_mu=std_pix * 5,
                 lower_sigma=std_pix, upper_sigma=std_pix * upper_sig_fact)
 
-            plt.scatter(rad_profile_dict['list_angles'][idx], gaussian_fit_dict['sig'])
+            # plt.scatter(rad_profile_dict['list_angles'][idx], gaussian_fit_dict['sig'])
 
-
-            # if (gaussian_fit_dict['amp'] > 0) & (np.abs(gaussian_fit_dict['mu']) < std_pix * model_pos_rad_accept_fact):
+            # if (gaussian_fit_dict['amp'] > 0) & (np.abs(gaussian_fit_dict['mu']) < std_pix * 3):
             #
             #     dummy_rad = np.linspace(np.min(rad_profile_dict[str(idx)]['radius_data']),
             #                             np.max(rad_profile_dict[str(idx)]['radius_data']), 500)
             #     gauss = helper_func.FitTools.gaussian_func(
             #         amp=gaussian_fit_dict['amp'], mu=gaussian_fit_dict['mu'], sig=gaussian_fit_dict['sig'], x_data=dummy_rad)
             #
-            #     ax[idx].plot(dummy_rad, gauss)
+            #     # ax[idx].plot(dummy_rad, gauss, color='r')
             #     plt.plot(dummy_rad, gauss)
-            # plt.show()
 
             # get the fit results
             amp_list.append(gaussian_fit_dict['amp'])
@@ -577,12 +625,41 @@ class ProfileTools:
 
         # plt.show()
 
-        # get the best matching gauss
+        return amp_list, mu_list, sig_list, amp_err_list, mu_err_list, sig_err_list
+
+    @staticmethod
+    def measure_morph_photometry(topo_dict, band, instrument, x_center, ycenter, rad_profile_dict, std_pix,
+                                 upper_sig_fact=10, central_rad_fact=3, model_pos_rad_accept_fact=1,
+                                 n_good_fits_needed=4):
+
+        amp_list, mu_list, sig_list, amp_err_list, mu_err_list, sig_err_list =\
+            ProfileTools.fit_gauss2rad_profiles(rad_profile_dict=rad_profile_dict, std_pix=std_pix,
+                                                upper_sig_fact=upper_sig_fact, central_rad_fact=central_rad_fact, )
+
+        #check if list is empty:
+        if not amp_list:
+
+            photometry_dict = {
+                'dummy_rad': np.nan,
+                'gauss': np.nan,
+                'amp': np.nan,
+                'mu': np.nan,
+                'sig': np.nan,
+                'flux': np.nan,
+                'flux_err': np.nan,
+                'detect_flag': False,
+                'good_fit_flag': False,
+                'n_successful_fits': 0
+            }
+            return photometry_dict
+
+        # switch to arrays
         amp_list = np.array(amp_list)
         mu_list = np.array(mu_list)
         sig_list = np.array(sig_list)
         amp_err_list = np.array(amp_err_list)
         sig_err_list = np.array(sig_err_list)
+
 
         # get all the gaussian functions that make sense
         # then need to be central
@@ -605,15 +682,15 @@ class ProfileTools:
             sig = topo_dict['psf_std_pix']
             # get flux inside the 3 sigma aperture
             flux = amp * 2 * np.pi * (sig ** 2)
-            flux_err = flux
+            flux_err = np.abs(flux)
             detect_flag = False
             good_fit_flag = False
             n_successful_fits = 0
 
         else:
 
-            amp = np.mean(amp_list[mask_mu * mask_amp])
-            mu = np.mean(mu_list[mask_mu * mask_amp])
+            amp = np.nanmean(amp_list[mask_mu * mask_amp])
+            mu = np.nanmean(mu_list[mask_mu * mask_amp])
             # if sum(mask_mu * mask_amp) == 1:
             #     # mean_amp =
             #     sig_1 = np.mean(sig_list[mask_mu * mask_amp])
@@ -622,28 +699,26 @@ class ProfileTools:
             #     sig_1 = np.min(sig_list[mask_mu * mask_amp])
             #     sig_2 = np.max(sig_list[mask_mu * mask_amp])
 
-            sig = np.mean(sig_list[mask_mu * mask_amp])
+            sig = np.nanmean(sig_list[mask_mu * mask_amp])
 
-            # get gaussian integaral as flux
+            # get gaussian integral as flux
             array_flux = amp_list[mask_mu * mask_amp] * 2 * np.pi * (sig_list[mask_mu * mask_amp] ** 2)
             array_flux_err = array_flux * np.sqrt(
                 (amp_err_list[mask_mu * mask_amp] / amp_list[mask_mu * mask_amp]) ** 2 +
                 (2 * sig_err_list[mask_mu * mask_amp] / sig_list[mask_mu * mask_amp]) ** 2)
             # calculate the flux as the average flux of all fits
-            flux = np.mean(array_flux)
+            flux = np.nanmean(array_flux)
 
-            # std_flux = np.std(array_flux)
-            std_flux = 0
+            # # std_flux = np.std(array_flux)
+            # std_flux = 0
             # add together all uncertainties
             total_fit_err = np.sqrt(np.sum(array_flux_err ** 2)) / sum(mask_mu * mask_amp)
 
-            # now get the uncertainties from the background
-            bkg_rms_region_stats = ApertTools.get_circ_apert_stats(data=topo_dict['bkg_rms'], data_err=None,
-                                                                   x_pos=x_center, y_pos=ycenter, aperture_rad=sig * 3)
-            bkg_err = bkg_rms_region_stats.sum
-            # print('total_fit_err ', total_fit_err)
-            # print('bkg_err ', bkg_err)
-            # print(np.std(array_flux))
+            # # now get the uncertainties from the background
+            # bkg_rms_region_stats = ApertTools.get_circ_apert_stats(data=topo_dict['bkg_rms'], data_err=None,
+            #                                                        x_pos=x_center, y_pos=ycenter, aperture_rad=sig * 3)
+            # bkg_err = bkg_rms_region_stats.sum
+
 
             # flux_err = np.sqrt(std_flux ** 2 + total_fit_err ** 2 + bkg_err ** 2)
             flux_err = total_fit_err
@@ -666,13 +741,13 @@ class ProfileTools:
         # print(sig_parcsec, topo_dict['psf_std'])
 
         # correct for PSF size and gaussian approximation
-        flux_corr_fact = ProfileTools.get_psf_gauss_corr_fact(band=band, instrument=instrument, std=sig_parcsec)
+        flux_corr_fact = PSFTools.get_psf_gauss_corr_fact(band=band, instrument=instrument, std=sig_parcsec)
         flux /= flux_corr_fact
         flux_err /= flux_corr_fact
 
         # compute a summy gaussian
-        dummy_rad = np.linspace(np.min(rad_profile_dict[str(idx)]['radius_data']),
-                                np.max(rad_profile_dict[str(idx)]['radius_data']), 500)
+        dummy_rad = np.linspace(np.min(rad_profile_dict['0']['radius_data']),
+                                np.max(rad_profile_dict['0']['radius_data']), 500)
         gauss = helper_func.FitTools.gaussian_func(
             amp=amp, mu=mu, sig=sig, x_data=dummy_rad)
 
@@ -689,10 +764,6 @@ class ProfileTools:
             'n_successful_fits': n_successful_fits
         }
         return photometry_dict
-
-
-
-
 
     @staticmethod
     def measure_morph_photometry_from_img(rad_profile_dict, gauss_std, img, bkg, img_err, wcs, ra, dec):
@@ -844,8 +915,6 @@ class ProfileTools:
         return photometry_dict
 
 
-
-
 class BKGTools:
     """
     all functions for background estimation
@@ -972,7 +1041,9 @@ class ApertTools:
                     phys_params.miri_bkg_annulus_radii_arcsec[band]['out'])
 
     @staticmethod
-    def compute_miri_photometry_aprt_corr(band, data, data_err, wcs, ra, dec, box_size=(20, 20), filter_size=(3,3),
+    def compute_miri_photometry_aprt_corr_old(band, data, data_err, wcs, ra, dec,
+
+                                          box_size=(20, 20), filter_size=(3,3),
                                           do_bkg_sigma_clip=True, bkg_sigma=3.0, bkg_maxiters=10,
                                           bkg_method='SExtractorBackground'):
 
@@ -982,13 +1053,15 @@ class ApertTools:
                                        'than the box size to estimate the background, which is set to: ', box_size)
 
         # get background
-        bkg_2d = PhotTools.compute_2d_bkg(data=data, box_size=box_size, filter_size=filter_size,
+        bkg_2d = BKGTools.compute_2d_bkg(data=data, box_size=box_size, filter_size=filter_size,
                                        do_sigma_clip=do_bkg_sigma_clip, sigma=bkg_sigma, maxiters=bkg_maxiters,
                                        bkg_method=bkg_method)
+
+
         # get fwhm ee radius
         rad = phys_params.miri_empirical_ee_apertures_arcsec[band]['FWHM']/2
 
-        flux_in_50ee_rad, flux_in_50ee_rad_err = PhotTools.extract_flux_from_circ_aperture(data=data - bkg_2d.background,
+        flux_in_apert_rad, flux_in_apert_rad_err = ApertTools.extract_flux_from_circ_aperture(data=data - bkg_2d.background,
                                                                                        data_err=data_err,
                                                                                        wcs=wcs,
                                                                                        ra=ra, dec=dec,
@@ -998,13 +1071,32 @@ class ApertTools:
         # plt.imshow(data)
         # plt.show()
         # get BKG estimation
-        bkg_stats = PhotTools.extract_bkg_from_circ_aperture(data=data, data_err=data_err, wcs=wcs, ra=ra, dec=dec,
+        bkg_stats = BKGTools.extract_bkg_from_circ_aperture(data=data, data_err=data_err, wcs=wcs, ra=ra, dec=dec,
                                                             aperture_rad=rad)
         # now multiply it by the ee factor
-        total_flux = flux_in_50ee_rad / phys_params.miri_empirical_ee_apertures_arcsec[band]['ee']
-        total_flux_err = np.sqrt((flux_in_50ee_rad_err * 2) ** 2 + (bkg_stats.std * 2) ** 2)
+        total_flux = flux_in_apert_rad / phys_params.miri_empirical_ee_apertures_arcsec[band]['ee']
+        total_flux_err = np.sqrt((flux_in_apert_rad_err * 2) ** 2 + (bkg_stats.std * 2) ** 2)
         # compute also median and std background
+
+
         return total_flux, total_flux_err, bkg_stats.median
+
+    @staticmethod
+    def compute_miri_photometry_aprt_corr(region_topo_dict, band):
+
+        # get fwhm ee radius
+        rad = phys_params.miri_empirical_ee_apertures_arcsec[band]['FWHM']/2
+
+        flux_in_apert_rad, flux_in_apert_rad_err = ApertTools.extract_flux_from_circ_aperture(
+            data=region_topo_dict['img'] - region_topo_dict['bkg'],  data_err=region_topo_dict['img_err'],
+            wcs=region_topo_dict['wcs'], ra=region_topo_dict['ra'], dec=region_topo_dict['dec'], aperture_rad=rad)
+
+        # now multiply it by the ee factor
+        total_flux = flux_in_apert_rad / phys_params.miri_empirical_ee_apertures_arcsec[band]['ee']
+        total_flux_err = np.sqrt((flux_in_apert_rad_err * 2) ** 2 + (region_topo_dict['bkg_central_stats'].std * 2) ** 2)
+        # compute also median and std background
+
+        return total_flux, total_flux_err
 
     @staticmethod
     def extract_flux_from_circ_aperture(data, data_err, wcs, ra, dec, aperture_rad):
@@ -1087,7 +1179,6 @@ class ApertTools:
         flux : float
         flux_err : float
         """
-
         # pos = SkyCoord(ra=ra * u.deg, dec=dec * u.deg)
         apertures = CircularAperture((x_pos, y_pos), aperture_rad)
         if data_err is None:
@@ -1277,13 +1368,13 @@ class ApertTools:
     def compute_phot_jimena(ra, dec, data, err, wcs, obs, band, aperture_rad=None, annulus_rad_in=None,
                             annulus_rad_out=None, target=None, gal_ext_corr=False):
         if aperture_rad is None:
-            aperture_rad = PhotTools.get_ap_rad(obs=obs, band=band, wcs=wcs)
+            aperture_rad = ApertTools.get_ap_rad(obs=obs, band=band, wcs=wcs)
 
         if (annulus_rad_in is None) | (annulus_rad_out is None):
-            annulus_rad_in, annulus_rad_out = PhotTools.get_annulus_rad(obs=obs, wcs=wcs, band=band)
+            annulus_rad_in, annulus_rad_out = ApertTools.get_annulus_rad(obs=obs, wcs=wcs, band=band)
 
         flux, flux_err, flux_err_9010, flux_err_9010_clip, flux_err_delta_apertures = \
-            PhotTools.extract_flux_from_circ_aperture_jimena(
+            ApertTools.extract_flux_from_circ_aperture_jimena(
                 ra=ra, dec=dec, data=data, err=err, wcs=wcs, aperture_rad=aperture_rad,
                 annulus_rad_in=annulus_rad_in,
                 annulus_rad_out=annulus_rad_out)
@@ -1297,9 +1388,9 @@ class ApertTools:
 
     @staticmethod
     def compute_ap_corr_phot_jimena(target, ra, dec, data, err, wcs, obs, band):
-        flux_dict = PhotTools.compute_phot_jimena(ra=ra, dec=dec, data=data, err=err, wcs=wcs, obs=obs, band=band,
+        flux_dict = ApertTools.compute_phot_jimena(ra=ra, dec=dec, data=data, err=err, wcs=wcs, obs=obs, band=band,
                                                   target=target)
-        aperture_corr = PhotTools.get_ap_corr(obs=obs, band=band, target=target)
+        aperture_corr = ApertTools.get_ap_corr(obs=obs, band=band, target=target)
 
         flux_dict['flux'] *= 10 ** (aperture_corr / -2.5)
 
@@ -1401,6 +1492,28 @@ class ApertTools:
 
         return structure_df
 
+    @staticmethod
+    def compute_annulus_ci(img, img_err, wcs, ra, dec, rad_1_arcsec, rad_2_arcsec):
+
+        flux_1, flux_err_1 = ApertTools.extract_flux_from_circ_aperture(data=img, data_err=img_err, wcs=wcs, ra=ra, dec=dec, aperture_rad=rad_1_arcsec)
+        flux_2, flux_err_2 = ApertTools.extract_flux_from_circ_aperture(data=img, data_err=img_err, wcs=wcs, ra=ra, dec=dec, aperture_rad=rad_2_arcsec)
+
+        ab_mag_1 = helper_func.UnitTools.conv_mjy2ab_mag(flux=flux_1)
+        # ab_mag_err_1 = helper_func.UnitTools.conv_mjy_err2vega_err(flux=flux_1, flux_err=flux_err_1)
+
+        ab_mag_2 = helper_func.UnitTools.conv_mjy2ab_mag(flux=flux_2)
+        # ab_mag_err_2 = helper_func.UnitTools.conv_mjy_err2vega_err(flux=flux_2, flux_err=flux_err_2)
+
+        ci = ab_mag_1 - ab_mag_2
+        # ci_err = np.sqrt(ab_mag_err_1**2 + ab_mag_err_2**2)
+
+        return ci  #, ci_err
+
+
+
+
+
+
 
 class SrcTools:
     """
@@ -1415,6 +1528,10 @@ class SrcTools:
         return dao_find(data)
 
     @staticmethod
+    def detect_peaks(data, detection_threshold, box_size):
+        return find_peaks(data=data, threshold=detection_threshold, box_size=box_size)
+
+    @staticmethod
     def detect_star_like_src_from_topo_dict(topo_dict, src_threshold_detect_factor=3, src_fwhm_detect_factor=1):
 
         # perform source detection
@@ -1422,6 +1539,7 @@ class SrcTools:
             data=topo_dict['img'] - topo_dict['bkg'],
             detection_threshold=src_threshold_detect_factor * np.nanmedian(topo_dict['bkg_rms']),
             src_fwhm_pix=src_fwhm_detect_factor * topo_dict['psf_fwhm_pix'])
+
         # get detected sources in
         if dao_detection is None:
             x_src = []
@@ -1436,12 +1554,46 @@ class SrcTools:
             ra_src = list(positions_world.ra.deg)
             dec_src = list(positions_world.dec.deg)
 
-        src_dict = {'x_src': x_src, 'y_src': y_src, 'ra_src': ra_src, 'dec_src': dec_src}
+        src_dict = {'x_src': x_src, 'y_src': y_src, 'ra_src': ra_src, 'dec_src': dec_src,
+                    'sky': dao_detection['sky'], 'peak': dao_detection['peak'], 'flux': dao_detection['flux'],
+                    'mag': dao_detection['mag'] }
 
         return src_dict
 
     @staticmethod
-    def re_center_src(init_ra, init_dec, wcs, mask, src_dict, re_center_rad_arcsec):
+    def detect_peaks_from_topo_dict(topo_dict, src_threshold_detect_factor=3, src_fwhm_detect_factor=1):
+
+        box_size = np.rint(src_fwhm_detect_factor * topo_dict['psf_fwhm_pix'])
+        if box_size < 3:
+            box_size = 3
+
+        # perform source detection
+        detected_peaks = SrcTools.detect_peaks(
+            data=topo_dict['img'] - topo_dict['bkg'],
+            detection_threshold=src_threshold_detect_factor * np.nanmedian(topo_dict['bkg_rms']),
+            box_size=box_size)
+
+        # get detected sources in
+        if detected_peaks is None:
+            x_src = []
+            y_src = []
+            ra_src = []
+            dec_src = []
+        else:
+            x_src = list(detected_peaks['x_peak'])
+            y_src = list(detected_peaks['y_peak'])
+            positions_world = topo_dict['wcs'].pixel_to_world(
+                detected_peaks['x_peak'], detected_peaks['y_peak'])
+            ra_src = list(positions_world.ra.deg)
+            dec_src = list(positions_world.dec.deg)
+
+        src_dict = {'x_src': x_src, 'y_src': y_src, 'ra_src': ra_src, 'dec_src': dec_src,
+                     'peak_value': detected_peaks['peak_value']}
+
+        return src_dict
+
+    @staticmethod
+    def re_center_src_world(init_ra, init_dec, data, wcs, mask, src_dict, re_center_rad_arcsec, centroid_rad_arcsec):
 
         init_pos = SkyCoord(ra=init_ra*u.deg, dec=init_dec*u.deg)
         init_pos_pix = wcs.world_to_pixel(init_pos)
@@ -1452,39 +1604,82 @@ class SrcTools:
         if src_dict['ra_src']:
             pos_src = SkyCoord(ra=src_dict['ra_src']*u.deg, dec=src_dict['dec_src']*u.deg)
             separation = pos_src.separation(init_pos)
-            mask_src_inside_psf_fwhm = separation < re_center_rad_arcsec * u.arcsec
-            if (sum(mask_src_inside_psf_fwhm) == 0) | pos_flag:
+            mask_src_inside_search_rad = separation < re_center_rad_arcsec * u.arcsec
+            if (sum(mask_src_inside_search_rad) == 0) | pos_flag:
                 ra_src_recenter, dec_src_recenter = init_ra, init_dec
                 x_src_recenter, y_src_recenter = init_pos_pix
+                src_flag = False
             else:
-                mask_closest_src = separation == np.min(separation)
-                ra_src_recenter = float(np.array(src_dict['ra_src'])[mask_closest_src])
-                dec_src_recenter = float(np.array(src_dict['dec_src'])[mask_closest_src])
-                x_src_recenter = float(np.array(src_dict['x_src'])[mask_closest_src])
-                y_src_recenter = float(np.array(src_dict['y_src'])[mask_closest_src])
+                # select the brightest peak.
+                max_value = np.array(src_dict['peak_value'] == np.nanmax(src_dict['peak_value'][mask_src_inside_search_rad]))
+                peak_pos_x = np.array(src_dict['x_src'])[max_value]
+                peak_pos_y = np.array(src_dict['y_src'])[max_value]
+
+                # now calculate the centroid
+                y_indices, x_indices = np.indices(data.shape)
+                centroid_rad_pix = helper_func.CoordTools.transform_world2pix_scale(
+                    length_in_arcsec=centroid_rad_arcsec, wcs=wcs)
+                selected_coords = np.sqrt((x_indices - peak_pos_x) ** 2 + (y_indices - peak_pos_y) ** 2) < centroid_rad_pix
+
+
+                x_centroid = np.average(x_indices[selected_coords], weights=data[selected_coords])
+                y_centroid = np.average(y_indices[selected_coords], weights=data[selected_coords])
+
+
+                # import matplotlib.pyplot as plt
+                # plt.imshow(data)
+                # plt.scatter(peak_pos_x, peak_pos_y)
+                # plt.show()
+                # data[~selected_coords] = np.nan
+                #
+                # plt.imshow(data)
+                # plt.scatter(x_centroid, y_centroid)
+                #
+                # plt.show()
+
+                # exit()
+
+                x_src_recenter = x_centroid
+                y_src_recenter = y_centroid
+                coords_recenter = wcs.pixel_to_world(x_src_recenter, y_src_recenter)
+                ra_src_recenter = coords_recenter.ra.deg
+                dec_src_recenter = coords_recenter.dec.deg
+                src_flag = True
 
         else:
             ra_src_recenter, dec_src_recenter = init_ra, init_dec
             x_src_recenter, y_src_recenter = init_pos_pix
+            src_flag = False
 
         re_center_dict = {'ra_src_recenter': ra_src_recenter, 'dec_src_recenter': dec_src_recenter,
-                          'x_src_recenter': x_src_recenter, 'y_src_recenter': y_src_recenter}
+                          'x_src_recenter': x_src_recenter, 'y_src_recenter': y_src_recenter,
+                          'src_flag': src_flag}
 
         return re_center_dict
 
     @staticmethod
     def recenter_src_from_topo_dict(topo_dict, src_threshold_detect_factor=3, src_fwhm_detect_factor=1,
-                                    re_center_rad_fact=1):
+                                    re_center_rad=None, re_center_rad_fact=1):
 
-        src_dict = SrcTools.detect_star_like_src_from_topo_dict(
+        src_dict = SrcTools.detect_peaks_from_topo_dict(
             topo_dict=topo_dict, src_threshold_detect_factor=src_threshold_detect_factor,
             src_fwhm_detect_factor=src_fwhm_detect_factor)
 
-        re_center_dict = SrcTools.re_center_src(
-            init_ra=topo_dict['ra'], init_dec=topo_dict['dec'], wcs=topo_dict['wcs'], mask=topo_dict['mask_bad_pixels'], src_dict=src_dict,
-            re_center_rad_arcsec=re_center_rad_fact * topo_dict['psf_fwhm'])
+        if re_center_rad is None:
+            re_center_rad = re_center_rad_fact * topo_dict['psf_fwhm']/2
+
+        re_center_dict = SrcTools.re_center_src_world(
+            init_ra=topo_dict['ra'], init_dec=topo_dict['dec'], data=topo_dict['img']-topo_dict['bkg'], wcs=topo_dict['wcs'], mask=topo_dict['mask_bad_pixels'], src_dict=src_dict,
+            re_center_rad_arcsec=re_center_rad, centroid_rad_arcsec=topo_dict['psf_fwhm'])
 
         return re_center_dict
+
+
+
+
+
+
+
 
 class PhotToolsOld:
     """

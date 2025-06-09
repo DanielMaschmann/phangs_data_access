@@ -145,6 +145,7 @@ dmypy.json
 *.tar
 *.DS_Store
 *.webm
+*.pickle
 
 # do not track the data_access_config.py file.
 cluster_cat_dr/data_access_config.py

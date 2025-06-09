@@ -38,7 +38,7 @@ class SpecTools:
         assert (instrument in ['muse', 'manga', 'sdss'])
         if instrument == 'muse':
             wave = phys_params.opt_line_wave[line][SpecTools.instrument2wave_ref(instrument=instrument)]
-            inst_broad_sig_wave = get_MUSE_polyFWHM(x=wave) / 2*np.sqrt(2*np.log(2))
+            inst_broad_sig_wave = get_MUSE_polyFWHM(x=wave) / (2*np.sqrt(2*np.log(2)))
             if unit == 'angstrom':
                 return inst_broad_sig_wave
             elif unit in ['kmps', 'mps']:

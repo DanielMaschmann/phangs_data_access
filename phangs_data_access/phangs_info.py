@@ -368,6 +368,8 @@ jwst_obs_band_dict = {
                 'miri_observed_bands': ['F770W', 'F1000W', 'F1130W', 'F2100W']},
     'ngc5068': {'nircam_observed_bands': ['F200W', 'F300M', 'F335M', 'F360M'],
                 'miri_observed_bands': ['F770W', 'F1000W', 'F1130W', 'F2100W']},
+    'ngc5194': {'nircam_observed_bands': ['F200W', 'F300M', 'F335M', 'F360M'],
+                'miri_observed_bands': ['F560W', 'F770W', 'F1000W', 'F1130W', 'F1280W', 'F1500W', 'F1800W', 'F2100W']},
     'ngc7496': {'nircam_observed_bands': ['F200W', 'F300M', 'F335M', 'F360M'],
                 'miri_observed_bands': ['F770W', 'F1000W', 'F1130W', 'F2100W']},
 }

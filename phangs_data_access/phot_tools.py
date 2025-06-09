@@ -25,6 +25,7 @@ from astropy.stats import SigmaClip
 from astropy.stats import sigma_clipped_stats
 
 from scipy.interpolate import interp1d
+from scipy import ndimage
 
 # owen packages
 from phangs_data_access import phys_params, helper_func, phangs_info
@@ -186,7 +187,6 @@ class PSFTools:
         # now there is not an estimated PSF for every filter at the moment hence we use the closest filter available
         with open(path2psf_dict / psf_dict_filename, 'rb') as file_name:
             psf_dict = pickle.load(file_name)
-        # print(psf_dict)
         return psf_dict[band]
 
     @staticmethod
@@ -308,7 +308,6 @@ class PSFTools:
         mu = psf_dict['gaussian_mean']
         sig = psf_dict['gaussian_std']
         return amp * np.exp(-(rad_arcsec - mu) ** 2 / (2 * sig ** 2))
-
 
     @staticmethod
     def get_psf_gauss_corr_fact(band, instrument, std):
@@ -673,7 +672,7 @@ class ProfileTools:
         if sum(mask_mu * mask_amp) == 0:
             # none detection
             # compute the maximal flux inside the 1 sigma PSF environment
-            src_region_stats = ApertTools.get_circ_apert_stats(
+            src_region_stats = ApertTools.get_apert_stats(
                 data=topo_dict['img'], data_err=None, x_pos=x_center, y_pos=ycenter,
                 aperture_rad=topo_dict['psf_std_pix'])
 
@@ -715,7 +714,7 @@ class ProfileTools:
             total_fit_err = np.sqrt(np.sum(array_flux_err ** 2)) / sum(mask_mu * mask_amp)
 
             # # now get the uncertainties from the background
-            # bkg_rms_region_stats = ApertTools.get_circ_apert_stats(data=topo_dict['bkg_rms'], data_err=None,
+            # bkg_rms_region_stats = ApertTools.get_apert_stats(data=topo_dict['bkg_rms'], data_err=None,
             #                                                        x_pos=x_center, y_pos=ycenter, aperture_rad=sig * 3)
             # bkg_err = bkg_rms_region_stats.sum
 
@@ -774,11 +773,11 @@ class ProfileTools:
 
         radius_of_interes = gauss_std * 3
 
-        central_apert_stats_source = ApertTools.get_sky_circ_apert_stats(data=img - bkg, data_err=img_err,
+        central_apert_stats_source = ApertTools.get_sky_apert_stats(data=img - bkg, data_err=img_err,
                                                                                wcs=wcs,
                                                                                ra=ra, dec=dec,
                                                                                aperture_rad=radius_of_interes)
-        central_apert_stats_bkg = ApertTools.get_sky_circ_apert_stats(data=bkg, data_err=img_err, wcs=wcs,
+        central_apert_stats_bkg = ApertTools.get_sky_apert_stats(data=bkg, data_err=img_err, wcs=wcs,
                                                                             ra=ra, dec=dec,
                                                                             aperture_rad=radius_of_interes)
 
@@ -920,7 +919,7 @@ class BKGTools:
     all functions for background estimation
     """
     @staticmethod
-    def compute_2d_bkg(data, box_size=(5, 5), filter_size=(3,3), do_sigma_clip=True, sigma=3.0, maxiters=10,
+    def compute_2d_bkg(data, box_size=(5, 5), filter_size=(3, 3), do_sigma_clip=True, sigma=3.0, maxiters=10,
                        bkg_method='SExtractorBackground'):
         if do_sigma_clip:
             sigma_clip = SigmaClip(sigma=sigma, maxiters=maxiters)
@@ -1012,91 +1011,261 @@ class ApertTools:
     def get_ap_corr(obs, band, target=None):
         if obs=='hst':
             return phys_params.hst_broad_band_aperture_4px_corr[target][band]
-        elif obs == 'hst_ha':
-            return phys_params.hst_ha_aperture_4px_corr[target][band]
         elif obs == 'nircam':
             return phys_params.nircam_aperture_corr[band]['ap_corr']
         elif obs == 'miri':
             return -2.5*np.log10(2)
 
     @staticmethod
-    def get_ap_rad(obs, band, wcs):
-        if (obs == 'hst') | ( obs == 'hst_ha'):
-            return wcs.proj_plane_pixel_scales()[0].value * 3600 * 4
+    def get_standard_ap_rad_pix(obs, band):
+        if obs == 'hst':
+            return phys_params.hst_aperture_rad_pix[band]
         if obs == 'nircam':
-            return wcs.proj_plane_pixel_scales()[0].value * 3600 * phys_params.nircam_aperture_corr[band]['n_pix']
+            return phys_params.nircam_aperture_rad_pix[band]
         if obs == 'miri':
-            return phys_params.miri_aperture_rad[band]
+            return phys_params.miri_empirical_fwhm[band]['fwhm_pix']
 
     @staticmethod
-    def get_annulus_rad(obs, band=None, wcs=None):
-        if (obs == 'hst') | ( obs == 'hst_ha'):
-            return (wcs.proj_plane_pixel_scales()[0].value * 3600 * phys_params.hst_bkg_annulus_radii_pix['in'],
-                    wcs.proj_plane_pixel_scales()[0].value * 3600 * phys_params.hst_bkg_annulus_radii_pix['out'])
+    def get_standard_ap_rad_arcsec(obs, band, wcs):
+        if obs == 'hst':
+            return wcs.proj_plane_pixel_scales()[0].value * 3600 * phys_params.hst_aperture_rad_pix[band]
         if obs == 'nircam':
-            return (wcs.proj_plane_pixel_scales()[0].value * 3600 * phys_params.nircam_bkg_annulus_radii_pix['in'],
-                    wcs.proj_plane_pixel_scales()[0].value * 3600 * phys_params.nircam_bkg_annulus_radii_pix['out'])
+            return wcs.proj_plane_pixel_scales()[0].value * 3600 * phys_params.nircam_aperture_rad_pix[band]
         if obs == 'miri':
-            return (phys_params.miri_bkg_annulus_radii_arcsec[band]['in'],
-                    phys_params.miri_bkg_annulus_radii_arcsec[band]['out'])
+            return phys_params.miri_empirical_fwhm[band]['fwhm_arcsec']
 
     @staticmethod
-    def compute_miri_photometry_aprt_corr_old(band, data, data_err, wcs, ra, dec,
-
-                                          box_size=(20, 20), filter_size=(3,3),
-                                          do_bkg_sigma_clip=True, bkg_sigma=3.0, bkg_maxiters=10,
-                                          bkg_method='SExtractorBackground'):
-
-        # make sure that the data provided is large enough to compute a background
-        if (data.shape[0] < 5 * box_size[0]) | (data.shape[1] < 5 * box_size[1]):
-            raise KeyError(data.shape, ' is the shape of the input data and should be at least 5 times larger '
-                                       'than the box size to estimate the background, which is set to: ', box_size)
-
-        # get background
-        bkg_2d = BKGTools.compute_2d_bkg(data=data, box_size=box_size, filter_size=filter_size,
-                                       do_sigma_clip=do_bkg_sigma_clip, sigma=bkg_sigma, maxiters=bkg_maxiters,
-                                       bkg_method=bkg_method)
-
-
-        # get fwhm ee radius
-        rad = phys_params.miri_empirical_ee_apertures_arcsec[band]['FWHM']/2
-
-        flux_in_apert_rad, flux_in_apert_rad_err = ApertTools.extract_flux_from_circ_aperture(data=data - bkg_2d.background,
-                                                                                       data_err=data_err,
-                                                                                       wcs=wcs,
-                                                                                       ra=ra, dec=dec,
-                                                                                       aperture_rad=rad)
-
-        # import matplotlib.pyplot as plt
-        # plt.imshow(data)
-        # plt.show()
-        # get BKG estimation
-        bkg_stats = BKGTools.extract_bkg_from_circ_aperture(data=data, data_err=data_err, wcs=wcs, ra=ra, dec=dec,
-                                                            aperture_rad=rad)
-        # now multiply it by the ee factor
-        total_flux = flux_in_apert_rad / phys_params.miri_empirical_ee_apertures_arcsec[band]['ee']
-        total_flux_err = np.sqrt((flux_in_apert_rad_err * 2) ** 2 + (bkg_stats.std * 2) ** 2)
-        # compute also median and std background
-
-
-        return total_flux, total_flux_err, bkg_stats.median
+    def get_standard_bkg_annulus_rad_pix(obs, band=None):
+        if (obs == 'hst') | ( obs == 'hst_ha'):
+            return phys_params.hst_bkg_annulus_radii_pix['rad_in'], phys_params.hst_bkg_annulus_radii_pix['rad_out']
+        if obs == 'nircam':
+            return phys_params.nircam_bkg_annulus_pix['rad_in'], phys_params.nircam_bkg_annulus_pix['rad_out']
+        if obs == 'miri':
+            return phys_params.miri_bkg_annulus_pix[band]['rad_in'], phys_params.miri_bkg_annulus_pix[band]['rad_out']
 
     @staticmethod
-    def compute_miri_photometry_aprt_corr(region_topo_dict, band):
+    def get_standard_bkg_annulus_rad_arcsec(obs, band=None, wcs=None):
+        if (obs == 'hst') | ( obs == 'hst_ha'):
+            return (wcs.proj_plane_pixel_scales()[0].value * 3600 * phys_params.hst_bkg_annulus_radii_pix['rad_in'],
+                    wcs.proj_plane_pixel_scales()[0].value * 3600 * phys_params.hst_bkg_annulus_radii_pix['rad_out'])
+        if obs == 'nircam':
+            return (wcs.proj_plane_pixel_scales()[0].value * 3600 * phys_params.nircam_bkg_annulus_pix['rad_in'],
+                    wcs.proj_plane_pixel_scales()[0].value * 3600 * phys_params.nircam_bkg_annulus_pix['rad_out'])
+        if obs == 'miri':
+            return (wcs.proj_plane_pixel_scales()[0].value * 3600 * phys_params.miri_bkg_annulus_pix[band]['rad_in'],
+                    wcs.proj_plane_pixel_scales()[0].value * 3600 * phys_params.miri_bkg_annulus_pix[band]['rad_out'])
 
-        # get fwhm ee radius
-        rad = phys_params.miri_empirical_ee_apertures_arcsec[band]['FWHM']/2
+    @staticmethod
+    def compute_standard_hst_apert_photometry(data, data_err, wcs, ra, dec, band, mask=None, sigma_clip_sig=3,
+                                     sigma_clip_maxiters=5):
+        # For HST a 4 pixel aperture is chosen
+        apert_rad_pix = phys_params.hst_aperture_rad_pix[band]
+        rad_arcsec = helper_func.CoordTools.transform_pix2world_scale(length_in_pix=apert_rad_pix, wcs=wcs)
 
-        flux_in_apert_rad, flux_in_apert_rad_err = ApertTools.extract_flux_from_circ_aperture(
-            data=region_topo_dict['img'] - region_topo_dict['bkg'],  data_err=region_topo_dict['img_err'],
-            wcs=region_topo_dict['wcs'], ra=region_topo_dict['ra'], dec=region_topo_dict['dec'], aperture_rad=rad)
+        # get the annulus for the background
+        bkg_annulus_rad_in_pix = phys_params.hst_bkg_annulus_radii_pix[band]['rad_in']
+        bkg_annulus_rad_out_pix = phys_params.hst_bkg_annulus_radii_pix[band]['rad_out']
+        bkg_annulus_rad_in_arcsec = helper_func.CoordTools.transform_pix2world_scale(
+            length_in_pix=bkg_annulus_rad_in_pix, wcs=wcs)
+        bkg_annulus_rad_out_arcsec = helper_func.CoordTools.transform_pix2world_scale(
+            length_in_pix=bkg_annulus_rad_out_pix, wcs=wcs)
 
-        # now multiply it by the ee factor
-        total_flux = flux_in_apert_rad / phys_params.miri_empirical_ee_apertures_arcsec[band]['ee']
-        total_flux_err = np.sqrt((flux_in_apert_rad_err * 2) ** 2 + (region_topo_dict['bkg_central_stats'].std * 2) ** 2)
-        # compute also median and std background
+        return ApertTools.compute_apert_photometry(
+            apert_rad_arcsec=rad_arcsec, bkg_rad_annulus_in_arcsec=bkg_annulus_rad_in_arcsec,
+            bkg_rad_annulus_out_arcsec=bkg_annulus_rad_out_arcsec, data=data, data_err=data_err, wcs=wcs, ra=ra,
+            dec=dec, mask=mask, sigma_clip_sig=sigma_clip_sig, sigma_clip_maxiters=sigma_clip_maxiters)
 
-        return total_flux, total_flux_err
+    @staticmethod
+    def compute_standard_nircam_apert_photometry(data, data_err, wcs, ra, dec, band, mask=None, sigma_clip_sig=3,
+                                      sigma_clip_maxiters=5):
+
+        apert_rad_pix = phys_params.nircam_aperture_rad_pix[band]
+        rad_arcsec = helper_func.CoordTools.transform_pix2world_scale(length_in_pix=apert_rad_pix, wcs=wcs)
+
+        # get the annulus for the background
+        bkg_annulus_rad_in_pix = phys_params.nircam_bkg_annulus_pix[band]['rad_in']
+        bkg_annulus_rad_out_pix = phys_params.nircam_bkg_annulus_pix[band]['rad_out']
+        bkg_annulus_rad_in_arcsec = helper_func.CoordTools.transform_pix2world_scale(
+            length_in_pix=bkg_annulus_rad_in_pix, wcs=wcs)
+        bkg_annulus_rad_out_arcsec = helper_func.CoordTools.transform_pix2world_scale(
+            length_in_pix=bkg_annulus_rad_out_pix, wcs=wcs)
+
+        return ApertTools.compute_apert_photometry(
+            apert_rad_arcsec=rad_arcsec, bkg_rad_annulus_in_arcsec=bkg_annulus_rad_in_arcsec,
+            bkg_rad_annulus_out_arcsec=bkg_annulus_rad_out_arcsec, data=data, data_err=data_err, wcs=wcs, ra=ra,
+            dec=dec, mask=mask, sigma_clip_sig=sigma_clip_sig, sigma_clip_maxiters=sigma_clip_maxiters)
+
+    @staticmethod
+    def compute_standard_miri_apert_photometry(data, data_err, wcs, ra, dec, band, mask=None, sigma_clip_sig=3,
+                                      sigma_clip_maxiters=5):
+        # get fwhm of band
+        rad_arcsec = phys_params.miri_empirical_fwhm[band]['fwhm_arcsec'] / 2
+
+        # get the annulus for the background
+        bkg_annulus_rad_in_pix = phys_params.miri_bkg_annulus_pix[band]['rad_in']
+        bkg_annulus_rad_out_pix = phys_params.miri_bkg_annulus_pix[band]['rad_out']
+        bkg_annulus_rad_in_arcsec = helper_func.CoordTools.transform_pix2world_scale(
+            length_in_pix=bkg_annulus_rad_in_pix, wcs=wcs)
+        bkg_annulus_rad_out_arcsec = helper_func.CoordTools.transform_pix2world_scale(
+            length_in_pix=bkg_annulus_rad_out_pix, wcs=wcs)
+
+        return ApertTools.compute_apert_photometry(
+            apert_rad_arcsec=rad_arcsec, bkg_rad_annulus_in_arcsec=bkg_annulus_rad_in_arcsec,
+            bkg_rad_annulus_out_arcsec=bkg_annulus_rad_out_arcsec, data=data, data_err=data_err, wcs=wcs, ra=ra,
+            dec=dec, mask=mask, sigma_clip_sig=sigma_clip_sig, sigma_clip_maxiters=sigma_clip_maxiters)
+
+    @staticmethod
+    def compute_apert_photometry(apert_rad_arcsec, bkg_rad_annulus_in_arcsec, bkg_rad_annulus_out_arcsec, data,
+                                 data_err, wcs, ra, dec, mask=None, sigma_clip_sig=3, sigma_clip_maxiters=5, sum_method='exact'):
+
+        # get coordinates
+        coords = SkyCoord(ra=ra*u.deg, dec=dec*u.deg)
+        coords_pix = wcs.world_to_pixel(coords)
+
+        # define a sigma-clipping class which will be used for the background
+        sig_clip = SigmaClip(sigma=sigma_clip_sig, maxiters=sigma_clip_maxiters)
+
+        # calculate standard background statistics in annulus
+        bkg_stats = ApertTools.get_sky_annulus_stats(
+            data=data, data_err=data_err, wcs=wcs, ra=ra, dec=dec, annulus_rad_in_arcsec=bkg_rad_annulus_in_arcsec,
+            annulus_rad_out_arcsec=bkg_rad_annulus_out_arcsec, mask=mask, sig_clip=sig_clip, sum_method=sum_method)
+
+        # get the 10th and 90th percentile of the annulus
+        # get the annulus radii in pixel for the background
+        bkg_rad_annulus_in_pix = helper_func.CoordTools.transform_world2pix_scale(
+            length_in_arcsec=bkg_rad_annulus_in_arcsec, wcs=wcs).value
+        bkg_rad_annulus_out_pix = helper_func.CoordTools.transform_world2pix_scale(
+            length_in_arcsec=bkg_rad_annulus_out_arcsec, wcs=wcs).value
+
+        bkg_10_clip, bkg_90_clip, bkg_ok_flag = ApertTools.compute_annulus_quantiles(
+            coords_pix=coords_pix, annulus_rad_in_pix=bkg_rad_annulus_in_pix,
+            annulus_rad_out_pix=bkg_rad_annulus_out_pix, sum_method=sum_method, data=data, sig_clip=sig_clip,
+            quantile_low=0.1, quantile_high=0.9)
+
+        # calculate stats in the aperture
+        apert_stats = ApertTools.get_sky_apert_stats(
+            data=data, data_err=data_err, wcs=wcs, ra=ra, dec=dec, aperture_rad_arcsec=apert_rad_arcsec, mask=mask,
+            sig_clip=None, sum_method=sum_method)
+
+
+        # get the surfaces of aperture and anulus
+        area_apert = apert_stats.sum_aper_area.value
+        area_annulus = bkg_stats.sum_aper_area.value
+
+
+        # flux is simply the sum inside the aperture
+        apert_flux = apert_stats.sum
+        # we can get also the uncertainty from the flux inside the aperture
+        # from the ApertureStats: ``sum_err`` is the quadrature sum of the total errors over the unmasked pixels
+        # within the aperture:
+        apert_flux_err = apert_stats.sum_err
+
+        # get background estimations
+        bkg_mean = bkg_stats.mean
+        bkg_median = bkg_stats.median
+        bkg_std = bkg_stats.std
+        bkg_min = bkg_stats.min
+        bkg_max = bkg_stats.max
+        # get additional stats for the apert
+        apert_max = apert_stats.max
+        apert_min = apert_stats.min
+
+        # compute background in aperture
+        apert_bkg_median = bkg_median * area_apert
+        apert_bkg_10_clip = bkg_10_clip * area_apert
+        apert_bkg_90_clip = bkg_90_clip * area_apert
+
+        # the flux of the src is the total flux from the aperture minus the bkg estimation
+        src_flux = apert_flux - apert_bkg_median
+        # in some cases it can come to bad measurement due to noisy sources or a very high background.
+        # This manifests in negative fluxes for example
+        if src_flux < 0: flux_measure_ok_flag = False
+        else: flux_measure_ok_flag = True
+
+        """
+        In order to estimate the true source error we are following the logic of 
+        https://wise2.ipac.caltech.edu/staff/fmasci/ApPhotUncert.pdf
+        This is further adapted this procedure to the uncertainty estimation describes in 
+        Rodriguez+2025 2025ApJ...983..137R section 3.2
+        """
+
+        # calculate the errors
+        """
+        include an additional term that reflects the variation in measurement when using the 10th and 90th percentiles
+         of the background. 
+        This difference corresponds to 4.6 sigma if the distribution of background annulus values is Gaussian.
+        Therefore, we divide by 4.6 to obtain the 1 sigma uncertainty
+        """
+        bkg_err = (apert_bkg_90_clip - apert_bkg_10_clip) / 4.6
+
+        # the two last terms can be identified in EQ1 of https://wise2.ipac.caltech.edu/staff/fmasci/ApPhotUncert.pdf
+        src_flux_err = np.sqrt(
+            # uncertainty from data in the aperture
+            pow(apert_flux_err, 2.) +
+            # uncertainty due to background fluctuation
+            pow(bkg_err, 2.) +
+            (pow(bkg_err * area_apert, 2) / area_annulus) * np.pi / 2)
+
+
+        flux_dict = {
+            'src_flux': src_flux,
+            'src_flux_err': src_flux_err,
+            'flux_measure_ok_flag': flux_measure_ok_flag,
+
+            'apert_max': apert_max,
+            'apert_min': apert_min,
+
+            'bkg_mean': bkg_mean,
+            'bkg_median': bkg_median,
+            'bkg_std': bkg_std,
+            'bkg_min': bkg_min,
+            'bkg_max': bkg_max,
+
+            'bkg_10_clip': bkg_10_clip,
+            'bkg_90_clip': bkg_90_clip,
+            'bkg_ok_flag': bkg_ok_flag
+        }
+
+        return flux_dict
+
+    @staticmethod
+    def compute_annulus_quantiles(coords_pix, annulus_rad_in_pix, annulus_rad_out_pix, sum_method, data, sig_clip=None,
+                                  quantile_low=0.1, quantile_high=0.9):
+
+        # get a mask for the annulus
+        bkg_annulus_aperture_xy = CircularAnnulus(positions=coords_pix, r_in=annulus_rad_in_pix,
+                                                  r_out=annulus_rad_out_pix)
+        annulus_masks_xy = bkg_annulus_aperture_xy.to_mask(method=sum_method)
+
+
+        # create data array with only datapoints inside the annulus
+        annulus_data = annulus_masks_xy.multiply(data)
+        if annulus_data is not None:
+            # getting all data points in the annulus (because of the mask, 0 are masked out). Furthermore, we avoid
+            # nans and infinite values
+            annulus_data_1d = annulus_data[(annulus_data != 0) & (np.isfinite(annulus_data)) &
+                                           (~np.isnan(annulus_data))]
+            # check if there are points selected! if not there is definitely a problem!
+            if len(annulus_data_1d) > 0:
+                if sig_clip is not None:
+                    annulus_data_sig_clipped = sig_clip(annulus_data_1d, masked=False)
+                    # get the low and high percentile of all the pixel values in the annulus
+                    annulus_low_clip, annulus_high_clip = np.quantile(annulus_data_sig_clipped,
+                                                                      [quantile_low, quantile_high])
+                else:
+                    annulus_low_clip, annulus_high_clip = np.quantile(annulus_data_1d,
+                                                                      [quantile_low, quantile_high])
+                annulus_ok_flag = True
+            else:
+                annulus_low_clip = 0.
+                annulus_high_clip = 0.
+                annulus_ok_flag = False
+        else:
+            annulus_low_clip = 0.
+            annulus_high_clip = 0.
+            annulus_ok_flag = False
+
+        return annulus_low_clip, annulus_high_clip, annulus_ok_flag
 
     @staticmethod
     def extract_flux_from_circ_aperture(data, data_err, wcs, ra, dec, aperture_rad):
@@ -1135,7 +1304,8 @@ class ApertTools:
         return flux, flux_err
 
     @staticmethod
-    def get_sky_circ_apert_stats(data, data_err, wcs, ra, dec, aperture_rad):
+    def get_sky_apert_stats(data, data_err, wcs, ra, dec, aperture_rad_arcsec, mask=None, sig_clip=None,
+                            sum_method='exact'):
         """
 
         Parameters
@@ -1143,8 +1313,11 @@ class ApertTools:
         data : ``numpy.ndarray``
         wcs : ``astropy.wcs.WCS``
         pos : ``astropy.coordinates.SkyCoord``
-        aperture_rad : float
+        aperture_rad_arcsec : float
         data_err : ``numpy.ndarray``
+        mask : ``numpy.ndarray``
+        sig_clip: ``astropy.stats.SigmaClip``
+        sum_method: str
 
         Returns
         -------
@@ -1154,17 +1327,85 @@ class ApertTools:
 
         pos = SkyCoord(ra=ra * u.deg, dec=dec * u.deg)
 
-        apertures = SkyCircularAperture(pos, aperture_rad * u.arcsec)
-        if data_err is None:
-            mask = ((np.isinf(data)) | (np.isnan(data)))
-        else:
-            mask = ((np.isinf(data)) | (np.isnan(data)) | (np.isinf(data_err)) | (np.isnan(data_err)))
+        apertures = SkyCircularAperture(pos, aperture_rad_arcsec * u.arcsec)
+        if mask is None:
+            if data_err is None:
+                mask = ((np.isinf(data)) | (np.isnan(data)))
+            else:
+                mask = ((np.isinf(data)) | (np.isnan(data)) | (np.isinf(data_err)) | (np.isnan(data_err)))
 
-        return ApertureStats(data, apertures, wcs=wcs, error=data_err, sigma_clip=None, mask=mask)
-
+        return ApertureStats(data, apertures, error=data_err, wcs=wcs, mask=mask, sigma_clip=sig_clip,
+                             sum_method=sum_method)
 
     @staticmethod
-    def get_circ_apert_stats(data, data_err, x_pos, y_pos, aperture_rad):
+    def get_apert_stats(data, data_err, x_pos, y_pos, aperture_rad_pix, mask=None, sig_clip=None, sum_method='exact'):
+        """
+
+        Parameters
+        ----------
+        data : ``numpy.ndarray``
+        data_err : ``numpy.ndarray`` or None
+        x_pos, y_pos : `float
+        aperture_rad_pix : float
+        mask : ``numpy.ndarray``
+        sig_clip: ``astropy.stats.SigmaClip``
+        sum_method: str
+
+        Returns
+        -------
+        flux : float
+        flux_err : float
+        """
+        # pos = SkyCoord(ra=ra * u.deg, dec=dec * u.deg)
+        apertures = CircularAperture((x_pos, y_pos), aperture_rad_pix)
+        if mask is None:
+            if data_err is None:
+                mask = ((np.isinf(data)) | (np.isnan(data)))
+            else:
+                mask = ((np.isinf(data)) | (np.isnan(data)) | (np.isinf(data_err)) | (np.isnan(data_err)))
+
+        return ApertureStats(data, apertures, error=data_err, mask=mask, sigma_clip=sig_clip, sum_method=sum_method)
+
+    @staticmethod
+    def get_sky_annulus_stats(data, data_err, wcs, ra, dec, annulus_rad_in_arcsec, annulus_rad_out_arcsec, mask=None,
+                              sig_clip=None, sum_method='exact'):
+        """
+
+        Parameters
+        ----------
+        data : ``numpy.ndarray``
+        wcs : ``astropy.wcs.WCS``
+        pos : ``astropy.coordinates.SkyCoord``
+        annulus_rad_in_arcsec : float
+        annulus_rad_out_arcsec : float
+        data_err : ``numpy.ndarray``
+        mask : ``numpy.ndarray``
+        sig_clip: ``astropy.stats.SigmaClip``
+        sum_method: str
+
+        Returns
+        -------
+        flux : float
+        flux_err : float
+        """
+
+        pos = SkyCoord(ra=ra * u.deg, dec=dec * u.deg)
+
+        # first get annulus aperture
+        annulus_aperture_sky = SkyCircularAnnulus(pos, r_in=annulus_rad_in_arcsec * u.arcsec,
+                                                  r_out=annulus_rad_out_arcsec * u.arcsec)
+
+        if mask is None:
+            if data_err is None:
+                mask = ((np.isinf(data)) | (np.isnan(data)))
+            else:
+                mask = ((np.isinf(data)) | (np.isnan(data)) | (np.isinf(data_err)) | (np.isnan(data_err)))
+
+        return ApertureStats(data=data, aperture=annulus_aperture_sky, error=data_err, wcs=wcs,
+                             sigma_clip=sig_clip, mask=mask, sum_method=sum_method)
+
+    @staticmethod
+    def get_apert_stats(data, data_err, x_pos, y_pos, aperture_rad):
         """
 
         Parameters
@@ -1371,7 +1612,7 @@ class ApertTools:
             aperture_rad = ApertTools.get_ap_rad(obs=obs, band=band, wcs=wcs)
 
         if (annulus_rad_in is None) | (annulus_rad_out is None):
-            annulus_rad_in, annulus_rad_out = ApertTools.get_annulus_rad(obs=obs, wcs=wcs, band=band)
+            annulus_rad_in, annulus_rad_out = ApertTools.get_standard_bkg_annulus_rad_arcsec(obs=obs, wcs=wcs, band=band)
 
         flux, flux_err, flux_err_9010, flux_err_9010_clip, flux_err_delta_apertures = \
             ApertTools.extract_flux_from_circ_aperture_jimena(
@@ -1397,102 +1638,6 @@ class ApertTools:
         return flux_dict
 
     @staticmethod
-    def extract_flux_from_circ_aperture_sinan(X, Y, image, annulus_r_in, annulus_r_out, aperture_radii):
-
-        """
-        This function was adapted to meet some standard ike variable naming. The functionality is untouched
-
-        Calculate the aperture photometry of given (X,Y) coordinates
-
-        Parameters
-        ----------
-
-        annulus_r_in:
-            the inner radius of the annulus at which to calculate the background
-        annulus_r_out: the outer radius of the annulus at which to calculate the background
-        aperture_radii: the list of aperture radii at which the photometry will be calculated.
-                        in units of pixels.
-        """
-
-        # SETTING UP FOR APERTURE PHOTOMETRY AT THE GIVEN X-Y COORDINATES
-        print('Initializing entire set of photometric apertures...')
-        'Initializing entire set of photometric apertures...'
-        # begin aperture photometry for DAO detections
-        # first set positions
-
-        # print(X, Y)
-        # positions = (X, Y)
-        # positions = [(X, Y)]
-        """The below line transforms the x & y coordinate list or single entries into the form photutils expects the input to be in."""
-        positions = np.column_stack((X, Y))
-
-        # then circular apertures
-        apertures = [CircularAperture(positions, r=r) for r in aperture_radii]
-        """Possibly no need, but may need to uncomment the below two lines in case 
-        two different annuli need to be defined"""
-        # then a single annulus aperture (for background) - Brad used 7-9 pixels
-        # annulus_apertures_phangs = CircularAnnulus(positions, r_in=annulus_r_in, r_out=annulus_r_in)
-        # another annulus aperture for the aperture correction
-        annulus_apertures_ac = CircularAnnulus(positions, r_in=annulus_r_in, r_out=annulus_r_out)
-        # need to subtract the smaller annulus_apertures_phangs from annulus_apertures_ac
-        # finally make a mask for the annulus aperture
-        annulus_masks = annulus_apertures_ac.to_mask(method='center')
-
-        """To plot the mask, uncomment below"""
-        # plt.imshow(annulus_masks[0])
-        # plt.colorbar()
-        # plt.show()
-
-        # FOR REFERENCE DETECTION IMAGE... determine robust, sig-clipped  median in the background annulus aperture at each detection location
-        bkg_median = []
-        bkg_std = []
-        for mask in annulus_masks:
-            annulus_data = mask.multiply(image)  # 25Feb2020 --  check whether the entire image is fed here
-            annulus_data_1d = annulus_data[mask.data > 0]
-            mean_sigclip, median_sigclip, std_sigclip = sigma_clipped_stats(annulus_data_1d)
-            bkg_median.append(median_sigclip)
-            bkg_std.append(std_sigclip)
-        bkg_median = np.array(bkg_median)
-        bkg_std = np.array(bkg_std)
-
-        # FOR REFERENCE DETECTION IMAGE... conduct the actual aperture photometry, making measurements for the entire set of aperture radii specified above
-        # PRODUCING THE SECOND TABLE PRODUCT ASSOCIATED WITH DAOFIND (CALLED 'APPHOT' TABLE)
-        # print('Conducting aperture photometry in progressive aperture sizes on reference image...')
-        'Conducting aperture photometry in progressive aperture sizes on reference image...'
-        apphot = aperture_photometry(image, apertures)
-        # FOR REFERENCE DETECTION IMAGE... add in the ra, dec, n_zero and bkg_median info to the apphot result
-        # apphot['ra'] = ra
-        # apphot['dec'] = dec
-        apphot['annulus_median'] = bkg_median
-        apphot['annulus_std'] = bkg_std
-        # apphot['aper_bkg'] = apphot['annulus_median'] * aperture.area
-
-        for l in range(len(aperture_radii)):
-            # FOR REFERENCE DETECTION IMAGE... background subtract the initial photometry
-            apphot['aperture_sum_' + str(l) + '_bkgsub'] = apphot['aperture_sum_' + str(l)] - (
-                        apphot['annulus_median'] * apertures[l].area)
-
-        # obj_list.append(np.array(apphot))
-
-        """convert to pandas dataframe here - note that apphot.colnames & radii are local parameters """
-
-        structure_data = np.array(apphot)
-        print('Number of structures: ', structure_data.shape[0])
-
-        structure_data_arr = np.zeros(shape=(structure_data.shape[0], len(apphot.colnames)))
-
-        """Note that the majority of the operations around here are to convert the mildly awful astropy
-        table format to a pandas dataframe"""
-
-        for arr_x in range(structure_data.shape[0]):
-            for arr_y in range(len(apphot.colnames)):
-                structure_data_arr[arr_x][arr_y] = structure_data[apphot.colnames[arr_y]][arr_x]
-
-        structure_df = pd.DataFrame(structure_data_arr, columns=apphot.colnames, dtype=np.float32)
-
-        return structure_df
-
-    @staticmethod
     def compute_annulus_ci(img, img_err, wcs, ra, dec, rad_1_arcsec, rad_2_arcsec):
 
         flux_1, flux_err_1 = ApertTools.extract_flux_from_circ_aperture(data=img, data_err=img_err, wcs=wcs, ra=ra, dec=dec, aperture_rad=rad_1_arcsec)
@@ -1510,21 +1655,18 @@ class ApertTools:
         return ci  #, ci_err
 
 
-
-
-
-
-
 class SrcTools:
     """
     Class to gather source detection algorithms
     """
 
     @staticmethod
-    def detect_star_like_src(data, detection_threshold, src_fwhm_pix):
+    def detect_star_like_src(data, detection_threshold, src_fwhm_pix, min_separation, roundhi=1, roundlo=-1, sharphi=1.0, sharplo=0.2):
 
         # define DAO star finder class
-        dao_find = DAOStarFinder(threshold=detection_threshold, fwhm=src_fwhm_pix)
+        dao_find = DAOStarFinder(threshold=detection_threshold, fwhm=src_fwhm_pix, min_separation=min_separation,
+                                 roundhi=roundhi, roundlo=roundlo, sharphi=sharphi, sharplo=sharplo)
+
         return dao_find(data)
 
     @staticmethod
@@ -1675,6 +1817,113 @@ class SrcTools:
         return re_center_dict
 
 
+class ScaleTools:
+    """
+    Tools to compute or identify scales
+    """
+    @staticmethod
+    def constrained_diffusion_decomposition(data, e_rel=3e-2, max_n=None, sm_mode='reflect', verbosity=False):
+
+        """
+        perform constrained diffusion decomposition
+
+
+        Parameters
+        ----------
+        data: ndarray
+            input image
+        e_rel: float
+            relative error, a smaller e_rel means a better
+            accuracy yet a larger computational cost
+        max_n: int
+            maximum number of channels. Channel number
+            ranges from 0 to max_n
+            if None, the program will calculate it automatically
+        sm_mode: str
+            {'reflect', 'constant', 'nearest', 'mirror', 'wrap'}, optional The mode
+            parameter determines how the input array is extended beyond its
+            boundaries in the convolution operation. Default is 'reflect'.
+        verbosity: bool
+            flag if progress printing is wanted
+
+        Returns
+        -------
+        scaling_result_list: list of ndarray
+            returns a list of constained diffusion decomposition. Assuming that the input
+            is a n-dimensional array, then the output would be a n+1 dimensional
+            array. The added dimension is the scale. Component maps can be accessed
+            via output[n], where n is the channel number.
+
+                output[i] contains structures of sizes larger than 2**i pixels
+                yet smaller than 2**(i+1) pixels.
+        residual: ndarray
+            structures too large to be contained in the results
+        kernel_sizes_list: list
+            all kernel sizes
+
+        """
+
+
+        # the total number of scale map to compute
+        ntot = int(np.log(min(data.shape)) / np.log(2) - 1)
+        if max_n is not None:
+            ntot = np.min([ntot, max_n])
+        if verbosity: print("ntot", ntot)
+
+        scaling_result_list = []
+        kernel_sizes_list = []
+        diff_image = data.copy() * 0
+
+        for i in range(ntot):  # loop over number of wanted scales
+            if verbosity: print("i =", i)
+            channel_image = data.copy() * 0
+
+            # computing the step size
+            scale_end = float(pow(2, i + 1))
+            scale_begining = float(pow(2, i))
+            t_end = scale_end ** 2 / 2  # t at the end of this scale
+            t_beginning = scale_begining ** 2 / 2  # t at the beginning of this scale
+
+            if i == 0:
+                delta_t_max = t_beginning * 0.1
+            else:
+                delta_t_max = t_beginning * e_rel
+
+            niter = int((t_end - t_beginning) / delta_t_max + 0.5)
+            delta_t = (t_end - t_beginning) / niter
+            print('niter ', niter)
+            print('delta_t ', delta_t)
+
+            kernel_size = np.sqrt(2 * delta_t)  # size of gaussian kernel
+            if verbosity: print(scale_begining, scale_end)
+            if verbosity: print("kernel_size", kernel_size)
+            for kk in range(niter):
+                smooth_image = ndimage.gaussian_filter(data, kernel_size,
+                                                       mode=sm_mode)
+                sm_image_1 = np.minimum(data, smooth_image)
+                sm_image_2 = np.maximum(data, smooth_image)
+
+                diff_image_1 = data - sm_image_1
+                diff_image_2 = data - sm_image_2
+
+                diff_image = diff_image * 0
+
+                positions_1 = np.where(np.logical_and(diff_image_1 > 0, data > 0))
+                positions_2 = np.where(np.logical_and(diff_image_2 < 0, data < 0))
+
+                diff_image[positions_1] = diff_image_1[positions_1]
+                diff_image[positions_2] = diff_image_2[positions_2]
+
+                channel_image = channel_image + diff_image
+
+                data = data - diff_image
+            scaling_result_list.append(channel_image)
+            kernel_sizes_list.append(kernel_size)
+        residual = data
+        return scaling_result_list, residual, kernel_sizes_list
+
+
+
 
 
 
@@ -1683,55 +1932,161 @@ class SrcTools:
 
 class PhotToolsOld:
     """
-    all functions related to photometry
+    old functions which will be soon deleted
     """
 
+    @staticmethod
+    def compute_miri_photometry_aprt_corr_old(band, data, data_err, wcs, ra, dec,
+                                              box_size=(20, 20), filter_size=(3, 3),
+                                              do_bkg_sigma_clip=True, bkg_sigma=3.0, bkg_maxiters=10,
+                                              bkg_method='SExtractorBackground'):
+
+        # make sure that the data provided is large enough to compute a background
+        if (data.shape[0] < 5 * box_size[0]) | (data.shape[1] < 5 * box_size[1]):
+            raise KeyError(data.shape, ' is the shape of the input data and should be at least 5 times larger '
+                                       'than the box size to estimate the background, which is set to: ', box_size)
+
+        # get background
+        bkg_2d = BKGTools.compute_2d_bkg(data=data, box_size=box_size, filter_size=filter_size,
+                                         do_sigma_clip=do_bkg_sigma_clip, sigma=bkg_sigma, maxiters=bkg_maxiters,
+                                         bkg_method=bkg_method)
+
+        # get fwhm ee radius
+        rad = phys_params.miri_empirical_ee_apertures_arcsec[band]['FWHM'] / 2
+
+        flux_in_apert_rad, flux_in_apert_rad_err = ApertTools.extract_flux_from_circ_aperture(
+            data=data - bkg_2d.background,
+            data_err=data_err,
+            wcs=wcs,
+            ra=ra, dec=dec,
+            aperture_rad=rad)
+
+        # import matplotlib.pyplot as plt
+        # plt.imshow(data)
+        # plt.show()
+        # get BKG estimation
+        bkg_stats = BKGTools.extract_bkg_from_circ_aperture(data=data, data_err=data_err, wcs=wcs, ra=ra, dec=dec,
+                                                            aperture_rad=rad)
+        # now multiply it by the ee factor
+        total_flux = flux_in_apert_rad / phys_params.miri_empirical_ee_apertures_arcsec[band]['ee']
+        total_flux_err = np.sqrt((flux_in_apert_rad_err * 2) ** 2 + (bkg_stats.std * 2) ** 2)
+        # compute also median and std background
+
+        return total_flux, total_flux_err, bkg_stats.median
 
     @staticmethod
-    def extract_flux_from_circ_aperture_save(data, wcs, pos, aperture_rad, data_err=None):
+    def compute_miri_photometry_aprt_corr(region_topo_dict, band):
+
+        # get fwhm ee radius
+        rad = phys_params.miri_empirical_ee_apertures_arcsec[band]['FWHM'] / 2
+
+        flux_in_apert_rad, flux_in_apert_rad_err = ApertTools.extract_flux_from_circ_aperture(
+            data=region_topo_dict['img'] - region_topo_dict['bkg'], data_err=region_topo_dict['img_err'],
+            wcs=region_topo_dict['wcs'], ra=region_topo_dict['ra'], dec=region_topo_dict['dec'], aperture_rad=rad)
+
+        # now multiply it by the ee factor
+        total_flux = flux_in_apert_rad / phys_params.miri_empirical_ee_apertures_arcsec[band]['ee']
+        total_flux_err = np.sqrt(
+            (flux_in_apert_rad_err * 2) ** 2 + (region_topo_dict['bkg_central_stats'].std * 2) ** 2)
+        # compute also median and std background
+
+        return total_flux, total_flux_err
+
+    @staticmethod
+    def extract_flux_from_circ_aperture_sinan(X, Y, image, annulus_r_in, annulus_r_out, aperture_radii):
+
         """
+        This function was adapted to meet some standard ike variable naming. The functionality is untouched
+
+        Calculate the aperture photometry of given (X,Y) coordinates
 
         Parameters
         ----------
-        data : ``numpy.ndarray``
-        wcs : ``astropy.wcs.WCS``
-        pos : ``astropy.coordinates.SkyCoord``
-        aperture_rad : float
-        data_err : ``numpy.ndarray``
 
-        Returns
-        -------
-        flux : float
-        flux_err : float
+        annulus_r_in:
+            the inner radius of the annulus at which to calculate the background
+        annulus_r_out: the outer radius of the annulus at which to calculate the background
+        aperture_radii: the list of aperture radii at which the photometry will be calculated.
+                        in units of pixels.
         """
-        # estimate background
-        bkg = sep.Background(np.array(data, dtype=float))
-        # get radius in pixel scale
-        pix_radius = helper_func.CoordTools.transform_world2pix_scale(length_in_arcsec=aperture_rad, wcs=wcs, dim=1)
-        # pix_radius_old = (wcs.world_to_pixel(pos)[0] -
-        #               wcs.world_to_pixel(SkyCoord(ra=pos.ra + aperture_rad * u.arcsec, dec=pos.dec))[0])
-        # print(pix_radius)
-        # print(pix_radius_old)
-        # exit()
-        # get the coordinates in pixel scale
-        pixel_coords = wcs.world_to_pixel(pos)
 
-        data = np.array(data.byteswap().newbyteorder(), dtype=float)
-        if data_err is None:
-            bkg_rms = bkg.rms()
-            data_err = np.array(bkg_rms.byteswap().newbyteorder(), dtype=float)
-        else:
-            data_err = np.array(data_err.byteswap().newbyteorder(), dtype=float)
+        # SETTING UP FOR APERTURE PHOTOMETRY AT THE GIVEN X-Y COORDINATES
+        print('Initializing entire set of photometric apertures...')
+        'Initializing entire set of photometric apertures...'
+        # begin aperture photometry for DAO detections
+        # first set positions
 
-        flux, flux_err, flag = sep.sum_circle(data=data - bkg.globalback, x=np.array([float(pixel_coords[0])]),
-                                              y=np.array([float(pixel_coords[1])]), r=np.array([float(pix_radius)]),
-                                              err=data_err)
+        # print(X, Y)
+        # positions = (X, Y)
+        # positions = [(X, Y)]
+        """The below line transforms the x & y coordinate list or single entries into the form photutils expects the input to be in."""
+        positions = np.column_stack((X, Y))
 
-        return float(flux), float(flux_err)
+        # then circular apertures
+        apertures = [CircularAperture(positions, r=r) for r in aperture_radii]
+        """Possibly no need, but may need to uncomment the below two lines in case 
+        two different annuli need to be defined"""
+        # then a single annulus aperture (for background) - Brad used 7-9 pixels
+        # annulus_apertures_phangs = CircularAnnulus(positions, r_in=annulus_r_in, r_out=annulus_r_in)
+        # another annulus aperture for the aperture correction
+        annulus_apertures_ac = CircularAnnulus(positions, r_in=annulus_r_in, r_out=annulus_r_out)
+        # need to subtract the smaller annulus_apertures_phangs from annulus_apertures_ac
+        # finally make a mask for the annulus aperture
+        annulus_masks = annulus_apertures_ac.to_mask(method='center')
 
-    # @staticmethod
-    # def compute_photo_ew(wave_min_left_band, wave_max_left_band, wave_min_right_band, wave_max_right_band,
-    #                      wave_min_narrow_band, wave_max_narrow_band, flux_left_band, flux_right_band, flux_narrowband):
+        """To plot the mask, uncomment below"""
+        # plt.imshow(annulus_masks[0])
+        # plt.colorbar()
+        # plt.show()
+
+        # FOR REFERENCE DETECTION IMAGE... determine robust, sig-clipped  median in the background annulus aperture at each detection location
+        bkg_median = []
+        bkg_std = []
+        for mask in annulus_masks:
+            annulus_data = mask.multiply(image)  # 25Feb2020 --  check whether the entire image is fed here
+            annulus_data_1d = annulus_data[mask.data > 0]
+            mean_sigclip, median_sigclip, std_sigclip = sigma_clipped_stats(annulus_data_1d)
+            bkg_median.append(median_sigclip)
+            bkg_std.append(std_sigclip)
+        bkg_median = np.array(bkg_median)
+        bkg_std = np.array(bkg_std)
+
+        # FOR REFERENCE DETECTION IMAGE... conduct the actual aperture photometry, making measurements for the entire set of aperture radii specified above
+        # PRODUCING THE SECOND TABLE PRODUCT ASSOCIATED WITH DAOFIND (CALLED 'APPHOT' TABLE)
+        # print('Conducting aperture photometry in progressive aperture sizes on reference image...')
+        'Conducting aperture photometry in progressive aperture sizes on reference image...'
+        apphot = aperture_photometry(image, apertures)
+        # FOR REFERENCE DETECTION IMAGE... add in the ra, dec, n_zero and bkg_median info to the apphot result
+        # apphot['ra'] = ra
+        # apphot['dec'] = dec
+        apphot['annulus_median'] = bkg_median
+        apphot['annulus_std'] = bkg_std
+        # apphot['aper_bkg'] = apphot['annulus_median'] * aperture.area
+
+        for l in range(len(aperture_radii)):
+            # FOR REFERENCE DETECTION IMAGE... background subtract the initial photometry
+            apphot['aperture_sum_' + str(l) + '_bkgsub'] = apphot['aperture_sum_' + str(l)] - (
+                    apphot['annulus_median'] * apertures[l].area)
+
+        # obj_list.append(np.array(apphot))
+
+        """convert to pandas dataframe here - note that apphot.colnames & radii are local parameters """
+
+        structure_data = np.array(apphot)
+        print('Number of structures: ', structure_data.shape[0])
+
+        structure_data_arr = np.zeros(shape=(structure_data.shape[0], len(apphot.colnames)))
+
+        """Note that the majority of the operations around here are to convert the mildly awful astropy
+        table format to a pandas dataframe"""
+
+        for arr_x in range(structure_data.shape[0]):
+            for arr_y in range(len(apphot.colnames)):
+                structure_data_arr[arr_x][arr_y] = structure_data[apphot.colnames[arr_y]][arr_x]
+
+        structure_df = pd.DataFrame(structure_data_arr, columns=apphot.colnames, dtype=np.float32)
+
+        return structure_df
 
     @staticmethod
     def compute_hst_photo_ew(target, left_band, right_band, narrow_band, flux_left_band, flux_right_band,

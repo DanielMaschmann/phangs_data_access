@@ -14,7 +14,6 @@ from astropy.wcs import WCS
 from astropy.wcs import FITSFixedWarning
 
 from astroquery.skyview import SkyView
-
 from phangs_data_access import phangs_access_config, helper_func, phot_tools, phangs_info, phys_params
 
 # ignore JWST pipline warning which comes from a header modification
@@ -517,8 +516,9 @@ class PhotAccess:
     def load_phangs_bands(self, band_list=None, flux_unit='Jy', load_err=False, load_hst=True, load_hst_ha=True,
                           load_nircam=True, load_miri=True, load_astrosat=True):
         """
-        wrapper to load all available HST, HST-H-alpha, NIRCAM and MIRI observations into the constructor
-        This function checks if the band is already loaded and skips the loading if this is the case
+        wrapper to load all available HST, HST-H-alpha, NIRCAM, MIRI and Astrosat observations into the constructor
+        This function checks if the band is already loaded and skips the loading if this is the case.
+        If furthermore also adapts the unit in case another unit is required.
 
         Parameters
         ----------
@@ -555,6 +555,8 @@ class PhotAccess:
                         if load_hst:
                             self.load_hst_band(band=band, flux_unit=flux_unit, load_err=load_err)
                     else:
+                        # make sure it has the correct unit
+                        self.change_band_unit(band=band, new_unit=flux_unit)
                         continue
             # check hst H-alpha
             if self.phot_hst_ha_cont_sub_target_name in phangs_info.hst_ha_cont_sub_dict.keys():
@@ -568,6 +570,8 @@ class PhotAccess:
                         if load_hst_ha:
                             self.load_hst_ha_cont_sub_band(flux_unit=flux_unit, load_err=load_err)
                     else:
+                        # make sure it has the correct unit
+                        self.change_band_unit(band=band, new_unit=flux_unit)
                         continue
             # check nircam
             if self.phot_nircam_target_name in phangs_info.jwst_obs_band_dict.keys():
@@ -600,6 +604,8 @@ class PhotAccess:
                         if load_astrosat:
                             self.load_astrosat_band(band=band, flux_unit=flux_unit, load_err=load_err)
                     else:
+                        # make sure it has the correct unit
+                        self.change_band_unit(band=band, new_unit=flux_unit)
                         continue
             if not band_loaded_flag:
                 raise KeyError('Band is not found in possible band lists')
@@ -894,7 +900,7 @@ class PhotAccess:
 
     def check_coords_covered_by_band(self, obs, ra, dec, band, max_dist_dist2hull_arcsec=2):
         """
-        Function to check if coordinate points are inside HST band observations
+        Function to check if coordinate points are inside band observations
 
         Parameters
         ----------
@@ -937,7 +943,6 @@ class PhotAccess:
             # plt.scatter(ra, dec)
             # plt.show()
 
-
         coverage_mask *= helper_func.GeometryTools.flag_close_points2ensemble(
             x_data=ra, y_data=dec, x_data_ensemble=hull_data_ra,y_data_ensemble=hull_data_dec,
             max_dist2ensemble=max_dist_dist2hull_arcsec/3600)
@@ -946,7 +951,7 @@ class PhotAccess:
 
     def check_coords_covered_by_obs(self, obs, ra, dec, band_list=None, max_dist_dist2hull_arcsec=2):
         """
-        Function to check if coordinate points are inside all HST observations
+        Function to check if coordinate points are inside all observations
 
         Parameters
         ----------
@@ -981,6 +986,177 @@ class PhotAccess:
         data_dss = paths_dss[0][0].data
         wcs_dss = WCS(paths_dss[0][0].header)
         return data_dss, wcs_dss
+
+    def compute_apert_photometry(self, ra, dec, band, obs, flux_unit='mJy'):
+
+        # make sure that data has been loaded
+        self.load_phangs_bands(band_list=band, flux_unit=flux_unit, load_err=True,
+                               load_hst=True, load_nircam=True, load_miri=True, load_astrosat=True)
+
+        img_wcs = getattr(self, '%s_bands_data' % obs)['%s_wcs_img' % band]
+
+        # get the cutout size (just twice the outer radius)
+
+        print(img_wcs)
+        exit()
+
+        # cutout_dict = self.get_band_cutout_dict(ra_cutout, dec_cutout, cutout_size, include_err=False, band_list=None)
+        #
+        # # compute cutout
+        # if obs == 'hst':
+        #     img_data = self.hst_bands_data['%s_data_img' % band]
+        #     '%s_data_img' % band: img_data, '%s_header_img'
+        # img_wcs = self.get
+        #
+        #
+        # phot_tools.ApertTools.compute_apert_photometry(data, data_err, wcs, ra, dec, band, obs, mask=None,
+        #                                                sigma_clip_sig=3,
+        #                                                sigma_clip_maxiters=5)
+
+
+    def compute_complete_photometry(self, ra, dec, rad_of_interest_arcsec, psf_substructure_ratio_lim=0.5,
+                                    band_list=None, max_dist_dist2hull_arcsec=2, bkg_scale_fact=40, flux_unit='mJy'):
+
+        # get entire band list to fit
+        complete_hst_band_list = helper_func.ObsTools.get_hst_obs_band_list(target=self.phot_hst_target_name)
+        complete_nircam_band_list = helper_func.ObsTools.get_nircam_obs_band_list(
+            target=self.phot_nircam_target_name)
+        complete_miri_band_list = helper_func.ObsTools.get_miri_obs_band_list(target=self.phot_miri_target_name)
+
+        if band_list is None:
+            hst_band_list = complete_hst_band_list
+            nircam_band_list = complete_nircam_band_list
+            miri_band_list = complete_miri_band_list
+            band_list = hst_band_list + nircam_band_list + miri_band_list
+        else:
+            hst_band_list = []
+            nircam_band_list = []
+            miri_band_list = []
+            for band in band_list:
+                if band in complete_hst_band_list:
+                    hst_band_list.append(band)
+                elif band in complete_nircam_band_list:
+                    nircam_band_list.append(band)
+                elif band in complete_miri_band_list:
+                    miri_band_list.append(band)
+
+        # get observation abd instrument list
+        obs_list = []
+        instrument_list = []
+        for band in band_list:
+            # get observations
+            if band in hst_band_list:
+                obs_list.append('hst')
+                instrument_list.append(helper_func.ObsTools.get_hst_instrument(target=self.phot_hst_target_name, band=band))
+            elif band in nircam_band_list:
+                obs_list.append('nircam')
+                instrument_list.append('nircam')
+            elif band in miri_band_list:
+                obs_list.append('miri')
+                instrument_list.append('miri')
+            else: raise RuntimeError(band, ' is in no observation present.')
+
+        # check if the coordinates are a list or just a float
+        if isinstance(ra, float):
+            ra = [ra]
+            dec = [dec]
+
+        ###########################
+        # now loop over all bands #
+        ###########################
+        for band_idx, band in enumerate(band_list):
+            # check if the band is loaded!
+            self.load_phangs_bands(band_list=[band], flux_unit=flux_unit, load_err=True)
+
+            # get psf scales for band
+            psf_dict = phot_tools.PSFTools.load_obs_psf_dict(band=band, instrument=instrument_list[band_idx])
+            fwhm_arcsec = psf_dict['gaussian_fwhm']
+
+            wcs = getattr(self, '%s_bands_data' % obs_list[band_idx])['%s_wcs_img' % band]
+
+            # estimate the standard_aperture_radius
+            standard_apert_rad_arcsec = phot_tools.ApertTools.get_standard_ap_rad_arcsec(obs=obs_list[band_idx], band=band, wcs=wcs)
+
+
+            # now check if the standard aperture is smaller than the PSF FWHM!
+            if standard_apert_rad_arcsec < (fwhm_arcsec / 2):
+                phot_aperture = fwhm_arcsec / 2
+                rad_in, rad_out = phot_tools.ApertTools.get_standard_bkg_annulus_rad_arcsec(obs=obs_list[band_idx], band=band, wcs=wcs)
+            else:
+                phot_aperture = standard_apert_rad_arcsec
+
+            print(band, fwhm_arcsec, standard_apert_rad_arcsec, fwhm_arcsec/2, rad_of_interest_arcsec)
+
+
+            # # estimate sizes needed for this band
+            # #
+            # if rad_of_interest_arcsec > (fwhm_arcsec / 2):
+            #     rad_phot_arcsec = rad_of_interest_arcsec
+            # else:
+            #     rad_phot_arcsec = fwhm_arcsec / 2
+            #
+            # # check if the resolution in greater than the radius of interest
+            # if (fwhm_arcsec / 2) / rad_of_interest_arcsec < psf_substructure_ratio_lim:
+            #     flag_look_for_substructure = True
+            # else:
+            #     flag_look_for_substructure = False
+            #
+
+
+
+            #################################
+            # now loop over all coordinates #
+            #################################
+
+
+            # # get data
+            # # it must be at least 2.5 times the radius we want to perform photometry on
+            # cutout_size = max(rad_of_interest_arcsec * 2.5, psf_dict['gaussian_fwhm'] * 1.25)
+            #
+            #
+            # # get a mask which coords are covered by the band
+            # band_covered_mask = self.check_coords_covered_by_band(
+            #     obs=obs_list[band_idx], ra=ra, dec=dec, band=band, max_dist_dist2hull_arcsec=cutout_size)
+            #
+            # # get the aperture radii and annuli
+            #
+            #
+            # # measure brute force aperture photometry
+            # foced_photomerty_dict = phot_tools.ApertTools.compute_apert_photometry(
+            #     apert_rad_arcsec, bkg_rad_annulus_in_arcsec, bkg_rad_annulus_out_arcsec, data, data_err, wcs, ra, dec, mask=None, sigma_clip_sig=3, sigma_clip_maxiters=5, sum_method='exact')
+            #
+
+
+
+
+
+
+            # print(band, flag_look_for_substructure)
+
+
+            # # load the cutout
+            # cutout_dict = self.get_band_cutout_dict(ra_cutout=ra, dec_cutout=dec, cutout_size=cutout_size,
+            #                                         include_err=True, band_list=[band])
+
+            # compute brute-force position photometry
+            # self.compute_apert_photometry(ra=ra, dec=dec, band=band, obs=obs_list[band_idx], flux_unit='mJy')
+
+            # source detection within the radius of interest.
+
+            # if flag_look_for_substructure is True we look for substructure if not, we simply recenter the source
+
+            # either do source
+
+
+
+
+
+        exit()
+
+
+
+
+
 
     def compute_2d_region_bkg(self, ra, dec, band, instrument, cutout_size, bkg_cutout_size=None,
                               bkg_img_size_factor=40, box_size_factor=2, filter_size_factor=1,
@@ -1057,10 +1233,10 @@ class PhotAccess:
         x_pos, y_pos = cutout_dict_src['%s_img_cutout' % band].wcs.world_to_pixel(SkyCoord(ra=ra*u.deg, dec=dec*u.deg))
 
         # get photometric statistics of the central position
-        img_central_stats = phot_tools.ApertTools.get_circ_apert_stats(
+        img_central_stats = phot_tools.ApertTools.get_apert_stats(
             data=cutout_dict_src['%s_img_cutout' % band].data, data_err=cutout_dict_src['%s_err_cutout' % band].data,
             x_pos=x_pos, y_pos=y_pos, aperture_rad=src_stats_rad_factor * psf_std_pix)
-        bkg_central_stats = phot_tools.ApertTools.get_circ_apert_stats(
+        bkg_central_stats = phot_tools.ApertTools.get_apert_stats(
             data=cutout_stamp_bkg.data, data_err=cutout_dict_src['%s_err_cutout' % band].data,
             x_pos=x_pos, y_pos=y_pos, aperture_rad=src_stats_rad_factor * psf_std_pix)
 
@@ -1176,10 +1352,10 @@ class PhotAccess:
     #     x_pos, y_pos = cutout_dict_src['%s_img_cutout' % band].wcs.world_to_pixel(SkyCoord(ra=ra*u.deg, dec=dec*u.deg))
     #
     #     # get photometric statistics of the central position
-    #     img_central_stats = phot_tools.ApertTools.get_circ_apert_stats(
+    #     img_central_stats = phot_tools.ApertTools.get_sky_apert_stats(
     #         data=cutout_dict_src['%s_img_cutout' % band].data, data_err=cutout_dict_src['%s_err_cutout' % band].data,
     #         x_pos=x_pos, y_pos=y_pos, aperture_rad=src_stats_rad_factor * psf_std_pix)
-    #     bkg_central_stats = phot_tools.ApertTools.get_circ_apert_stats(
+    #     bkg_central_stats = phot_tools.ApertTools.get_sky_apert_stats(
     #         data=cutout_stamp_bkg.data, data_err=cutout_dict_src['%s_err_cutout' % band].data,
     #         x_pos=x_pos, y_pos=y_pos, aperture_rad=src_stats_rad_factor * psf_std_pix)
     #

@@ -280,7 +280,24 @@ class CoordTools:
 
     @staticmethod
     def mask_2d_region_in_cube(cube, wcs_2d, ra, dec, cutoutsize):
-        print('lalala')
+        print('you lazy fucker should code this!')
+
+    @staticmethod
+    def find_cross_match(ra_obj1, dec_obj1, ra_obj2, dec_obj2, cross_match_rad_arcsec, nth_neighbor=1):
+        coords_obj1 = SkyCoord(ra=ra_obj1*u.deg, dec=dec_obj1*u.deg)
+        coords_obj2 = SkyCoord(ra=ra_obj2*u.deg, dec=dec_obj2*u.deg)
+
+        print(coords_obj1)
+        print(coords_obj2)
+
+
+        cross_match_idx_obj1_with_obj2, cross_match_d2d_obj1_with_obj2, _ = \
+            coords_obj2.match_to_catalog_sky(coords_obj1, nthneighbor=nth_neighbor)
+
+        mask_ob_obj1_with_obj2 = cross_match_d2d_obj1_with_obj2 < cross_match_rad_arcsec * u.arcsec
+
+        return mask_ob_obj1_with_obj2, cross_match_d2d_obj1_with_obj2, cross_match_idx_obj1_with_obj2
+
 
 class UnitTools:
     """

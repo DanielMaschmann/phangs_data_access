@@ -37,9 +37,9 @@ class GasAccess:
         if gas_target_name is not None:
             gas_target_name = helper_func.FileTools.target_name_no_directions(target=gas_target_name)
 
-        if (gas_target_name not in phangs_info.phangs_alma_galaxy_list) & (gas_target_name is not None):
-            raise AttributeError('The target %s is not in the PHANGS ALMA sample or has not been added to '
-                                 'the current package version' % gas_target_name)
+        # if (gas_target_name not in phangs_info.phangs_alma_galaxy_list) & (gas_target_name is not None):
+        #     # raise AttributeError('The target %s is not in the PHANGS ALMA sample or has not been added to '
+        #     #                      'the current package version' % gas_target_name)
 
         self.gas_target_name = gas_target_name
 

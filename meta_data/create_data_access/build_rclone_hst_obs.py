@@ -2,7 +2,6 @@
 Script to create script to rclone PHANGS HST observational data from google drive
 """
 import os.path
-from pathlib import Path
 from phangs_data_access import phangs_info, phangs_access_config, helper_func
 
 
@@ -25,7 +24,7 @@ for target in target_list:
 
     destination_str = (phangs_access_config.phangs_config_dict['hst_obs_data_local_path'] + '/' +
                        helper_func.FileTools.target_names_no_zeros(target=target) + '/')
-    check_destination_str = (phangs_access_config.phangs_config_dict['hst_obs_data_local_path'].replace('\ ', ' ') + '/' +
+    check_destination_str = (phangs_access_config.phangs_config_dict['hst_obs_data_local_path'] + '/' +
                        helper_func.FileTools.target_names_no_zeros(target=target) + '/')
     # loop over bands
     for band in phangs_info.hst_obs_band_dict[target]['acs']:
@@ -60,18 +59,28 @@ for target in target_list:
 
     for band in phangs_info.hst_obs_band_dict[target]['acs_uvis']:
         print('ACS and UVIS ', band)
-        data_path = (band.lower() + '/' + '%s_acsuvis_%s_exp_drc_sci.fits' %
-                     (helper_func.FileTools.target_names_no_zeros(target=target), band.lower()))
-        err_path = (band.lower() + '/' + '%s_acsuvis_%s_err_drc_wht.fits' %
-                    (helper_func.FileTools.target_names_no_zeros(target=target), band.lower()))
-        wht_path = (band.lower() + '/' + '%s_acsuvis_%s_exp_drc_wht.fits' %
-                    (helper_func.FileTools.target_names_no_zeros(target=target), band.lower()))
-        if not os.path.isfile(check_destination_str + data_path):
-            hst_rclone_file.writelines(path_str + data_path + ' ' + destination_str + 'acs_uvis' + band.lower() + ' \n')
-        if not os.path.isfile(check_destination_str + err_path):
-            hst_rclone_file.writelines(path_str + err_path + ' ' + destination_str + 'acs_uvis' + band.lower() + ' \n')
-        if not os.path.isfile(check_destination_str + wht_path):
-            hst_rclone_file.writelines(path_str + wht_path + ' ' + destination_str + 'acs_uvis' + band.lower() + ' \n')
+        if target == 'ngc0628':
+            band_folder_on_drive = band.lower() + '/'
+            instrument_specification = 'acsuvis'
+        elif target == 'ngc7793':
+            band_folder_on_drive = 'uvis' + band.lower() + '/'
+            instrument_specification = 'acs_uvis'
+        else:
+            raise KeyError('must be specified...')
+
+
+        data_path = ('%s_%s_%s_exp_drc_sci.fits' %
+                     (helper_func.FileTools.target_names_no_zeros(target=target), instrument_specification, band.lower()))
+        err_path = ('%s_%s_%s_err_drc_wht.fits' %
+                    (helper_func.FileTools.target_names_no_zeros(target=target), instrument_specification, band.lower()))
+        wht_path = ('%s_%s_%s_exp_drc_wht.fits' %
+                    (helper_func.FileTools.target_names_no_zeros(target=target), instrument_specification, band.lower()))
+        if not os.path.isfile(check_destination_str +  'acs_uvis' + band.lower() + '/' + data_path):
+            hst_rclone_file.writelines(path_str + band_folder_on_drive + data_path + ' ' + destination_str + 'acs_uvis' + band.lower() + ' \n')
+        if not os.path.isfile(check_destination_str +  'acs_uvis' + band.lower() + '/' + err_path):
+            hst_rclone_file.writelines(path_str + band_folder_on_drive + err_path + ' ' + destination_str + 'acs_uvis' + band.lower() + ' \n')
+        if not os.path.isfile(check_destination_str +  'acs_uvis' + band.lower() + '/' + wht_path):
+            hst_rclone_file.writelines(path_str + band_folder_on_drive + wht_path + ' ' + destination_str + 'acs_uvis' + band.lower() + ' \n')
 
 hst_rclone_file.close()
 

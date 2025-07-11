@@ -12,8 +12,6 @@ from astropy.wcs import WCS
 from astropy.io import ascii, fits
 import astropy.units as u
 from astropy.coordinates import SkyCoord
-from astropy.stats import SigmaClip
-from astropy.visualization.wcsaxes import SphericalCircle
 from astroquery.simbad import Simbad
 
 from pandas import read_csv
@@ -31,13 +29,9 @@ from shapely.geometry import Point
 from shapely.geometry.polygon import Polygon
 
 import matplotlib.pyplot as plt
-from matplotlib.colors import Normalize, LogNorm
-from matplotlib.colorbar import ColorbarBase
 
 from reproject import reproject_interp
 
-from astropy.stats import sigma_clipped_stats
-import pandas as pd
 import numpy as np
 
 from phangs_data_access import phys_params, phangs_info, sample_access
@@ -341,7 +335,7 @@ class UnitTools:
         return conversion_factor
 
     @staticmethod
-    def get_hst_img_conv_fct(img_header, img_wcs, flux_unit='Jy'):
+    def get_hst_img_conv_fct(img_header, img_wcs, flux_unit='Jy', no_header_conv=False):
         """
         get unit conversion factor to go from electron counts to mJy of HST images
         Parameters
@@ -349,28 +343,32 @@ class UnitTools:
         img_header : ``astropy.io.fits.header.Header``
         img_wcs : ``astropy.wcs.WCS``
         flux_unit : str
-
+        no_header_conv : bool
+            this keyword is to flagg hst products which have no header information and are provided in Jy
         Returns
         -------
         conversion_factor : float
 
         """
         # convert the flux unit
-        if 'PHOTFNU' in img_header:
-            conversion_factor = img_header['PHOTFNU']
-        elif 'PHOTFLAM' in img_header:
-            # wavelength in angstrom
-            pivot_wavelength = img_header['PHOTPLAM']
-            # inverse sensitivity, ergs/cm2/Ang/electron
-            sensitivity = img_header['PHOTFLAM']
-            # speed of light in Angstrom/s
-            c = speed_of_light_mps * 1e10
-            # change the conversion facto to get erg s−1 cm−2 Hz−1
-            f_nu = sensitivity * pivot_wavelength ** 2 / c
-            # change to get Jy
-            conversion_factor = f_nu * 1e23
+        if not no_header_conv:
+            if 'PHOTFNU' in img_header:
+                conversion_factor = img_header['PHOTFNU']
+            elif 'PHOTFLAM' in img_header:
+                # wavelength in angstrom
+                pivot_wavelength = img_header['PHOTPLAM']
+                # inverse sensitivity, ergs/cm2/Ang/electron
+                sensitivity = img_header['PHOTFLAM']
+                # speed of light in Angstrom/s
+                c = speed_of_light_mps * 1e10
+                # change the conversion facto to get erg s−1 cm−2 Hz−1
+                f_nu = sensitivity * pivot_wavelength ** 2 / c
+                # change to get Jy
+                conversion_factor = f_nu * 1e23
+            else:
+                raise KeyError('there is no PHOTFNU or PHOTFLAM in the header')
         else:
-            raise KeyError('there is no PHOTFNU or PHOTFLAM in the header')
+            conversion_factor = 1
 
         pixel_area_size_sr = img_wcs.proj_plane_pixel_area().value * phys_params.sr_per_square_deg
         # rescale data image
@@ -737,7 +735,7 @@ class FileTools:
         -------
         target_name : str
         """
-        if target[-1].isalpha():
+        if target[-1] in ['n', 's', 'w', 'e', 'c', 'N', 'S', 'W', 'E', 'C']:
             return target[:-1]
         else:
             return target
@@ -759,6 +757,21 @@ class FileTools:
             return target[0:3] + target[4:]
         else:
             return target
+
+    @staticmethod
+    def target_names_no_zeros_no_directions(target):
+        """
+        removes zeros from target name.
+
+        Parameters
+        ----------
+        target :  str
+
+        Returns
+        -------
+        target_name : str
+        """
+        return FileTools.target_name_no_directions(target=FileTools.target_names_no_zeros(target=target))
 
     @staticmethod
     def get_sample_table_target_name(target):
@@ -1002,27 +1015,8 @@ class ObsTools:
     Class to sort band names and identify instruments and telescopes
     """
 
-    @staticmethod
-    def get_hst_ha_instrument(target):
-        """
-        get the corresponding instrument for hst H-alpha observations
 
-        Parameters
-        ----------
-        target :  str
-
-        Returns
-        -------
-        target_name : str
-        """
-        if (('F657N' in phangs_info.hst_obs_band_dict[target]['uvis']) |
-                ('F658N' in phangs_info.hst_obs_band_dict[target]['uvis'])):
-            return 'uvis'
-        elif (('F657N' in phangs_info.hst_obs_band_dict[target]['acs']) |
-              ('F658N' in phangs_info.hst_obs_band_dict[target]['acs'])):
-            return 'acs'
-        else:
-            raise KeyError(target, ' has no H-alpha observation ')
+    # getting instruments and
 
     @staticmethod
     def get_hst_instrument(target, band):
@@ -1047,6 +1041,32 @@ class ObsTools:
         else:
             print(target, ' has no HST observation for the Band ', band)
             return None
+
+    @staticmethod
+    def get_hst_ha_instrument(target):
+        """
+        get the corresponding instrument for hst H-alpha observations
+
+        Parameters
+        ----------
+        target :  str
+
+        Returns
+        -------
+        target_name : str
+        """
+        if (('F657N' in phangs_info.hst_obs_band_dict[target]['uvis']) |
+                ('F658N' in phangs_info.hst_obs_band_dict[target]['uvis'])):
+            return 'uvis'
+        elif (('F657N' in phangs_info.hst_obs_band_dict[target]['acs']) |
+              ('F658N' in phangs_info.hst_obs_band_dict[target]['acs'])):
+            return 'acs'
+        else:
+            raise KeyError(target, ' has no H-alpha observation ')
+
+    #########################
+    #### band wavelength ####
+    #########################
 
     @staticmethod
     def get_hst_band_wave(band, instrument='acs', wave_estimator='mean_wave', unit='mu'):
@@ -1075,7 +1095,6 @@ class ObsTools:
         else:
             raise KeyError(instrument, ' is not a HST instrument')
 
-
     @staticmethod
     def get_roman_band_wave(band, wave_estimator='mean_wave', unit='mu'):
         """
@@ -1093,7 +1112,6 @@ class ObsTools:
         wavelength : float
         """
         return UnitTools.angstrom2unit(wave=phys_params.roman_bands_wave[band][wave_estimator], unit=unit)
-
 
     @staticmethod
     def get_jwst_band_wave(band, instrument='nircam', wave_estimator='mean_wave', unit='mu'):
@@ -1136,6 +1154,23 @@ class ObsTools:
         return UnitTools.angstrom2unit(wave=phys_params.astrosat_bands_wave[band][wave_estimator], unit=unit)
 
     @staticmethod
+    def get_phangs_telescope_wave(target, band, telescope, wave_estimator='mean_wave', unit='mu'):
+        if telescope == 'hst':
+            return ObsTools.get_hst_band_wave(
+                band=band, instrument=ObsTools.get_hst_instrument(target=target, band=band),
+                wave_estimator=wave_estimator, unit=unit)
+        elif telescope == 'nircam':
+            return ObsTools.get_jwst_band_wave(band=band, instrument='nircam', wave_estimator=wave_estimator, unit=unit)
+        elif telescope == 'miri':
+            return ObsTools.get_jwst_band_wave(band=band, instrument='miri', wave_estimator=wave_estimator, unit=unit)
+        elif telescope == 'astrosat':
+            return ObsTools.get_astrosat_band_wave(band=band, wave_estimator=wave_estimator, unit=unit)
+
+    #####################################################
+    #### band names, lists of available observations ####
+    #####################################################
+
+    @staticmethod
     def get_hst_obs_band_list(target):
         """
         gets list of bands of HST
@@ -1149,12 +1184,19 @@ class ObsTools:
         """
         acs_band_list = phangs_info.hst_obs_band_dict[target]['acs']
         uvis_band_list = phangs_info.hst_obs_band_dict[target]['uvis']
-        band_list = acs_band_list + uvis_band_list
+        acs_uvis_band_list = phangs_info.hst_obs_band_dict[target]['acs_uvis']
+        # ir_band_list = phangs_info.hst_obs_band_dict[target]['ir']
+        band_list = acs_band_list + uvis_band_list + acs_uvis_band_list #+ ir_band_list
         wave_list = []
         for band in acs_band_list:
             wave_list.append(ObsTools.get_hst_band_wave(band=band))
         for band in uvis_band_list:
             wave_list.append(ObsTools.get_hst_band_wave(band=band, instrument='uvis'))
+        for band in acs_uvis_band_list:
+            wave_list.append(ObsTools.get_hst_band_wave(band=band, instrument='uvis'))
+        # for band in ir_band_list:
+        #     wave_list.append(ObsTools.get_hst_band_wave(band=band, instrument='ir'))
+
 
         return ObsTools.sort_band_list(band_list=band_list, wave_list=wave_list)
 
@@ -1172,12 +1214,18 @@ class ObsTools:
         """
         acs_band_list = phangs_info.hst_obs_band_dict[target]['acs']
         uvis_band_list = phangs_info.hst_obs_band_dict[target]['uvis']
-        band_list = acs_band_list + uvis_band_list
+        acs_uvis_band_list = phangs_info.hst_obs_band_dict[target]['acs_uvis']
+        # ir_band_list = phangs_info.hst_obs_band_dict[target]['ir']
+        band_list = acs_band_list + uvis_band_list + acs_uvis_band_list #+ ir_band_list
         wave_list = []
         for band in acs_band_list:
             wave_list.append(ObsTools.get_hst_band_wave(band=band))
         for band in uvis_band_list:
             wave_list.append(ObsTools.get_hst_band_wave(band=band, instrument='uvis'))
+        for band in acs_uvis_band_list:
+            wave_list.append(ObsTools.get_hst_band_wave(band=band, instrument='uvis'))
+        # for band in ir_band_list:
+        #     wave_list.append(ObsTools.get_hst_band_wave(band=band, instrument='ir'))
 
         # kick out bands which are not broad bands
         for band, wave in zip(band_list, wave_list):
@@ -1185,6 +1233,131 @@ class ObsTools:
                 band_list.remove(band)
                 wave_list.remove(wave)
         return ObsTools.sort_band_list(band_list=band_list, wave_list=wave_list)
+
+    @staticmethod
+    def get_hst_ha_band(target):
+        """
+        get the corresponding H-alpha band for a target
+
+        Parameters
+        ----------
+        target :  str
+
+        Returns
+        -------
+        target_name : str
+        """
+        if (('F657N' in phangs_info.hst_obs_band_dict[target]['uvis']) |
+                ('F657N' in phangs_info.hst_obs_band_dict[target]['acs'])):
+            return 'F657N'
+        elif (('F658N' in phangs_info.hst_obs_band_dict[target]['uvis']) |
+              ('F658N' in phangs_info.hst_obs_band_dict[target]['acs'])):
+            return 'F658N'
+        else:
+            raise KeyError(target, ' has no H-alpha observation ')
+
+    @staticmethod
+    def get_nircam_obs_band_list(target, version=None):
+        """
+        gets list of bands of NIRCAM bands
+        Parameters
+        ----------
+        target : str
+        version : str
+        Returns
+        -------
+        band_list : list
+        """
+
+        if version is None: version = phangs_info.nircam_available_data_versions[-1]
+        nircam_band_list = getattr(phangs_info, 'jwst_obs_band_dict_%s' % version)[target]['nircam_observed_bands']
+        wave_list = []
+        for band in nircam_band_list:
+            wave_list.append(ObsTools.get_jwst_band_wave(band=band))
+        return ObsTools.sort_band_list(band_list=nircam_band_list, wave_list=wave_list)
+
+    @staticmethod
+    def get_miri_obs_band_list(target, version=None):
+        """
+        gets list of bands of MIRI bands
+        Parameters
+        ----------
+        target : str
+        Returns
+        -------
+        band_list : list
+        """
+        if version is None: version = phangs_info.miri_available_data_versions[-1]
+        miri_band_list = getattr(phangs_info, 'jwst_obs_band_dict_%s' % version)[target]['miri_observed_bands']
+        wave_list = []
+        for band in miri_band_list:
+            wave_list.append(ObsTools.get_jwst_band_wave(band=band, instrument='miri'))
+        return ObsTools.sort_band_list(band_list=miri_band_list, wave_list=wave_list)
+
+    @staticmethod
+    def get_astrosat_obs_band_list(target, version=None):
+        """
+        gets list of bands of HST
+        Parameters
+        ----------
+        target : str
+        Returns
+        -------
+        band_list : list
+        """
+        if version is None: version = phangs_info.astrosat_available_data_versions[-1]
+        astrosat_band_list = getattr(phangs_info, 'astrosat_obs_band_dict_%s' % version)[target]['observed_bands']
+        wave_list = []
+        for band in astrosat_band_list:
+            wave_list.append(ObsTools.get_astrosat_band_wave(band=band))
+        return ObsTools.sort_band_list(band_list=astrosat_band_list, wave_list=wave_list)
+
+    @staticmethod
+    def sort_band_list(band_list, wave_list):
+        """
+        sorts a band list with increasing wavelength
+        Parameters
+        ----------
+        band_list : list
+        wave_list : list
+        Returns
+        -------
+        sorted_band_list : list
+        """
+        # sort wavelength bands
+        sort = np.argsort(wave_list)
+        return list(np.array(band_list)[sort])
+
+    @staticmethod
+    def filter_name2hst_band(target, filter_name):
+        """
+        Method to get from band-pass filter names to the HST filter names used for this observation.
+        """
+        if filter_name == 'NUV': return 'F275W'
+        elif filter_name == 'U': return 'F336W'
+        elif filter_name == 'B':
+            if 'F438W' in phangs_info.hst_obs_band_dict[target]['uvis']: return 'F438W'
+            else: return 'F435W'
+        elif filter_name == 'V': return 'F555W'
+        elif filter_name == 'I': return 'F814W'
+        elif filter_name == 'Ha': return ObsTools.get_hst_ha_band(target=target)
+        else:
+            raise KeyError(filter_name, ' is not available ')
+
+    @staticmethod
+    def hst_band2filter_name(band, latex=True):
+        """
+        Method to get from HST filter names used for this observation to the band pass name.
+        """
+        if band == 'F275W': return 'NUV'
+        elif band == 'F336W': return 'U'
+        elif (band == 'F438W') | (band == 'F435W'): return 'B'
+        elif band == 'F555W': return 'V'
+        elif band == 'F814W': return 'I'
+        elif (band == 'F657N') | (band == 'F658N'):
+            if latex: return r'H$\alpha$'
+            else: return 'Ha'
+        else: raise KeyError(band, ' is not available ')
 
     @staticmethod
     def check_hst_obs(target):
@@ -1216,7 +1389,7 @@ class ObsTools:
         """
 
         if ObsTools.check_hst_obs(target=target):
-            band_list = ObsTools.get_hst_ha_band(target=target)
+            band_list = ObsTools.get_hst_obs_broad_band_list(target=target)
             for band in band_list:
                 if band[-1] == 'W':
                     return True
@@ -1227,98 +1400,65 @@ class ObsTools:
     @staticmethod
     def check_hst_ha_obs(target):
         """
-        boolean function checking if H-alpha band for a target exists
-        """
-        if (('F657N' in phangs_info.hst_obs_band_dict[target]['uvis']) |
-                ('F657N' in phangs_info.hst_obs_band_dict[target]['acs'])):
-            return True
-        elif (('F658N' in phangs_info.hst_obs_band_dict[target]['uvis']) |
-              ('F658N' in phangs_info.hst_obs_band_dict[target]['acs'])):
-            return True
-        else: return False
-
-    @staticmethod
-    def get_hst_ha_band(target):
-        """
-        get the corresponding H-alpha band for a target
-
+        check if HST has broad band observation available for target
         Parameters
         ----------
         target :  str
-
         Returns
         -------
-        target_name : str
+        observation flag : bool
         """
-        if (('F657N' in phangs_info.hst_obs_band_dict[target]['uvis']) |
-                ('F657N' in phangs_info.hst_obs_band_dict[target]['acs'])):
-            return 'F657N'
-        elif (('F658N' in phangs_info.hst_obs_band_dict[target]['uvis']) |
-              ('F658N' in phangs_info.hst_obs_band_dict[target]['acs'])):
-            return 'F658N'
-        else:
-            raise KeyError(target, ' has no H-alpha observation ')
+
+        if (('F657N' in ObsTools.get_hst_obs_band_list(target=target)) |
+                ('F658N' in ObsTools.get_hst_obs_band_list(target=target))):
+            return True
+        else: return False
+
 
     @staticmethod
-    def check_nircam_obs(target):
+    def check_hst_ha_cont_sub_obs(target):
+        """
+        boolean function checking if H-alpha band for a target exists
+        """
+        if target in list(phangs_info.hst_ha_cont_sub_dict.keys()):
+            return True
+        else: return False
+
+    @staticmethod
+    def check_nircam_obs(target, version=None):
         """
         check if NIRCAM observed
         """
-        if target in phangs_info.jwst_obs_band_dict.keys():
-            if phangs_info.jwst_obs_band_dict[target]['nircam_observed_bands']: return True
+        if version is None: version = phangs_info.nircam_available_data_versions[-1]
+        jwst_obs_band_dict = getattr(phangs_info, 'jwst_obs_band_dict_%s' % version)
+
+        if target in jwst_obs_band_dict.keys():
+            if jwst_obs_band_dict[target]['nircam_observed_bands']: return True
             else: return False
         else: return False
 
     @staticmethod
-    def check_miri_obs(target):
+    def check_miri_obs(target, version=None):
         """
         check if MIRI observed
         """
-        if target in phangs_info.jwst_obs_band_dict.keys():
-            if phangs_info.jwst_obs_band_dict[target]['miri_observed_bands']: return True
+        if version is None: version = phangs_info.miri_available_data_versions[-1]
+        jwst_obs_band_dict = getattr(phangs_info, 'jwst_obs_band_dict_%s' % version)
+
+        if target in jwst_obs_band_dict.keys():
+            if jwst_obs_band_dict[target]['miri_observed_bands']: return True
             else: return False
         else: return False
 
     @staticmethod
-    def get_nircam_obs_band_list(target):
-        """
-        gets list of bands of NIRCAM bands
-        Parameters
-        ----------
-        target : str
-        Returns
-        -------
-        band_list : list
-        """
-        nircam_band_list = phangs_info.jwst_obs_band_dict[target]['nircam_observed_bands']
-        wave_list = []
-        for band in nircam_band_list:
-            wave_list.append(ObsTools.get_jwst_band_wave(band=band))
-        return ObsTools.sort_band_list(band_list=nircam_band_list, wave_list=wave_list)
-
-    @staticmethod
-    def get_miri_obs_band_list(target):
-        """
-        gets list of bands of MIRI bands
-        Parameters
-        ----------
-        target : str
-        Returns
-        -------
-        band_list : list
-        """
-        miri_band_list = phangs_info.jwst_obs_band_dict[target]['miri_observed_bands']
-        wave_list = []
-        for band in miri_band_list:
-            wave_list.append(ObsTools.get_jwst_band_wave(band=band, instrument='miri'))
-        return ObsTools.sort_band_list(band_list=miri_band_list, wave_list=wave_list)
-
-    @staticmethod
-    def check_astrosat_obs(target):
+    def check_astrosat_obs(target, version=None):
         """
         Check for astrosat obs
         """
-        if target in phangs_info.astrosat_obs_band_dict.keys(): return True
+        if version is None: version = phangs_info.astrosat_available_data_versions[-1]
+        astrosat_obs_band_dict = getattr(phangs_info, 'astrosat_obs_band_dict_%s' % version)
+
+        if target in astrosat_obs_band_dict.keys(): return True
         else: return False
 
     @staticmethod
@@ -1349,69 +1489,8 @@ class ObsTools:
         if target in phangs_info.phangs_alma_galaxy_list: return True
         else: return False
 
-    @staticmethod
-    def get_astrosat_obs_band_list(target):
-        """
-        gets list of bands of HST
-        Parameters
-        ----------
-        target : str
-        Returns
-        -------
-        band_list : list
-        """
-        astrosat_band_list = phangs_info.astrosat_obs_band_dict[target]['observed_bands']
-        wave_list = []
-        for band in astrosat_band_list:
-            wave_list.append(ObsTools.get_astrosat_band_wave(band=band))
-        return ObsTools.sort_band_list(band_list=astrosat_band_list, wave_list=wave_list)
 
-    @staticmethod
-    def sort_band_list(band_list, wave_list):
-        """
-        sorts a band list with increasing wavelength
-        Parameters
-        ----------
-        band_list : list
-        wave_list : list
-        Returns
-        -------
-        sorted_band_list : list
-        """
-        # sort wavelength bands
-        sort = np.argsort(wave_list)
-        return list(np.array(band_list)[sort])
 
-    @staticmethod
-    def filter_name2hst_band(target, filter_name):
-        """
-        Method to get from band-pass filter names to the HST filter names used for this observation.
-        """
-        if filter_name == 'NUV': return 'F275W'
-        elif filter_name == 'U': return 'F336W'
-        elif filter_name == 'B':
-            if 'F438W' in phangs_info.hst_cluster_cat_obs_band_dict[target]['uvis']: return 'F438W'
-            else: return 'F435W'
-        elif filter_name == 'V': return 'F555W'
-        elif filter_name == 'I': return 'F814W'
-        elif filter_name == 'Ha': return ObsTools.get_hst_ha_band(target=target)
-        else:
-            raise KeyError(filter_name, ' is not available ')
-
-    @staticmethod
-    def hst_band2filter_name(band, latex=True):
-        """
-        Method to get from HST filter names used for this observation to the band pass name.
-        """
-        if band == 'F275W': return 'NUV'
-        elif band == 'F336W': return 'U'
-        elif (band == 'F438W') | (band == 'F435W'): return 'B'
-        elif band == 'F555W': return 'V'
-        elif band == 'F814W': return 'I'
-        elif (band == 'F657N') | (band == 'F658N'):
-            if latex: return r'H$\alpha$'
-            else: return 'Ha'
-        else: raise KeyError(band, ' is not available ')
 
 
 class GeometryTools:

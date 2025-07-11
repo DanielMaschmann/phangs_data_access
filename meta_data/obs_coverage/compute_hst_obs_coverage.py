@@ -9,12 +9,12 @@ from phangs_data_access import phot_access
 from phangs_data_access import helper_func
 from phangs_data_access import phangs_info
 
+import matplotlib.pyplot as plt
 
-target_list = phangs_info.phangs_treasury_hst_galaxy_list
+target_list = list(phangs_info.full_hst_galaxy_list)
 
 
 for target in target_list:
-
     # if os.path.isfile('data_output/%s_hst_obs_hull_dict.npy' % target):
     #     continue
     if target == 'ngc1510':
@@ -32,8 +32,14 @@ for target in target_list:
     for band in band_list:
 
         exp_file_name = phangs_phot.get_hst_img_file_name(band=band, file_type='wht')
-        data, header, wcs = helper_func.FileTools.load_img(file_name=exp_file_name)
+        if phangs_phot.phot_hst_target_name == 'ngc5194': hdu_number = 'WHT'
+        else: hdu_number = 0
+
+        data, header, wcs = helper_func.FileTools.load_img(file_name=exp_file_name, hdu_number=hdu_number)
         mask_covered_pixels = data > 0
+
+        # plt.imshow(np.log10(data))
+
 
         hull_dict = helper_func.GeometryTools.contour2hull(data_array=data, level=0, contour_index=0, n_max_rejection_vertice=1000)
 
@@ -47,8 +53,10 @@ for target in target_list:
             ra = coordinates.ra.deg
             dec = coordinates.dec.deg
             hull_coord_dict.update({idx: {'ra': ra, 'dec': dec}})
-        obs_hull_dict.update({band: hull_coord_dict})
+            # plt.plot(hull_dict[idx]['x_convex_hull'] - 1, hull_dict[idx]['y_convex_hull'] - 1)
 
+        obs_hull_dict.update({band: hull_coord_dict})
+        # plt.show()
     # save dictionary
     if not os.path.isdir('data_output'):
         os.makedirs('data_output')

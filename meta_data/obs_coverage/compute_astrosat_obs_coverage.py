@@ -10,12 +10,13 @@ from phangs_data_access import helper_func
 from phangs_data_access import phangs_info
 
 
-target_list = phangs_info.astrosat_obs_band_dict.keys()
+plot_flag = True
 
-# print(target_list)
-# print(phangs_info.hst_ha_obs_band_dict.keys())
-# exit()
+astrosat_version = 'v1p0'
 
+target_list = list(getattr(phangs_info, 'astrosat_obs_band_dict_%s' % astrosat_version).keys())
+
+print(target_list)
 
 for target in target_list:
 
@@ -24,10 +25,10 @@ for target in target_list:
 
 
     # now get astrosat bands
-    phangs_phot = phot_access.PhotAccess(target_name=target)
+    phangs_phot = phot_access.PhotAccess(phot_target_name=target, phot_nircam_target_name=target, astrosat_data_ver=astrosat_version)
 
     # get band list
-    band_list = helper_func.ObsTools.get_astrosat_obs_band_list(target=target)
+    band_list = helper_func.ObsTools.get_astrosat_obs_band_list(target=target, version=astrosat_version)
 
     print(target, ' bands, available: ', band_list)
     phangs_phot.load_phangs_bands(band_list=band_list)
@@ -62,7 +63,7 @@ for target in target_list:
     if not os.path.isdir('data_output'):
         os.makedirs('data_output')
 
-    with open('data_output/%s_astrosat_obs_hull_dict.npy' % target, 'wb') as file_name:
+    with open('data_output/%s_astrosat_obs_hull_dict_%s.npy' % (target, astrosat_version), 'wb') as file_name:
         pickle.dump(obs_hull_dict, file_name)
 
 

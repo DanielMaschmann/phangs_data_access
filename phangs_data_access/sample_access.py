@@ -5,7 +5,8 @@ from pathlib import Path
 from astropy.table import Table
 import numpy as np
 from phangs_data_access import phangs_access_config, helper_func
-
+from astroquery.simbad import Simbad
+from astroquery.ipac.ned import Ned
 
 class SampleAccess:
     """
@@ -66,10 +67,11 @@ class SampleAccess:
         target : str
             Galaxy name
         """
+        if target == 'ngc1808': return 76.926384, -37.512920
         self.check_load_phangs_data_table()
         mask_target = self.phangs_sample_table['name'] == target
-        return (self.phangs_sample_table['orient_ra'][mask_target].value[0],
-                self.phangs_sample_table['orient_dec'][mask_target].value[0])
+        return (float(self.phangs_sample_table['orient_ra'][mask_target].value[0]),
+                float(self.phangs_sample_table['orient_dec'][mask_target].value[0]))
 
     def get_target_sfr(self, target):
         """
@@ -166,6 +168,10 @@ class SampleAccess:
         """
         self.check_load_phangs_data_table()
         mask_target = self.phangs_sample_table['name'] == target
+        if (sum(mask_target) == 0) & (target=='ngc1808'):
+            # distance estimated from Tully fisher 2017A&A...598A..55B and 2009AJ....138..323T
+            return 12.8
+
         return self.phangs_sample_table['dist'][mask_target].value[0]
 
     def get_target_dist_err(self, target):
@@ -175,6 +181,9 @@ class SampleAccess:
         self.check_load_phangs_data_table()
         mask_target = self.phangs_sample_table['name'] == target
         dist_unc_dex = self.phangs_sample_table['dist_unc'][mask_target].value[0]
+        if (sum(mask_target) == 0) & (target=='ngc1808'):
+            # distance estimated from Tully fisher 2017A&A...598A..55B and 2009AJ....138..323T
+            return 1.2
 
         return (10 ** (np.log10(self.get_target_dist(target=target)) + dist_unc_dex) -
                 self.get_target_dist(target=target))
@@ -185,6 +194,9 @@ class SampleAccess:
         """
         self.check_load_phangs_data_table()
         mask_target = self.phangs_sample_table['name'] == target
+        if (sum(mask_target) == 0) & (target=='ngc1808'):
+            # distance estimated from Tully fisher 2017A&A...598A..55B and 2009AJ....138..323T
+            return 'TF'
         return self.phangs_sample_table['dist_label'][mask_target].value[0]
 
     def get_target_arcsec_re(self, target):

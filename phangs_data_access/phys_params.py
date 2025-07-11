@@ -333,7 +333,7 @@ nirspec_gratings = {
 # hst
 # The aperture sizes are 4 pixels for each band. The background is estimated between 7 and 9 pixels
 # this is explained in Deger+2022 (2022MNRAS.510...32D)
-hst_aperture_rad_pix = {'F275W': 4, 'F336W': 4, 'F435W': 4, 'F438W': 4, 'F555W': 4, 'F657N': 4, 'F658N': 4, 'F814W': 4}
+hst_aperture_rad_pix = {'F275W': 4, 'F336W': 4, 'F435W': 4, 'F438W': 4, 'F555W': 4,  'F547M': 4, 'F657N': 4, 'F658N': 4, 'F814W': 4}
 
 hst_bkg_annulus_radii_pix = {'rad_in': 7., 'rad_out': 9.}
 
@@ -460,8 +460,7 @@ nircam_empirical_ee_apertures_arcsec = {
 }
 
 
-nircam_aperture_rad_pix = {'F200W': 4, 'F300M': 2, 'F335M': 2, 'F360M': 2}
-
+nircam_aperture_rad_pix = {'F150W': 4, 'F200W': 4, 'F300M': 2, 'F335M': 2, 'F360M': 2}
 
 nircam_bkg_annulus_pix = {
     'rad_in': 8.,
@@ -532,16 +531,16 @@ miri_empirical_fwhm = {
     'F2550W' : {'pivot_wave_mu': 25.147, 'fwhm_arcsec': 0.803, 'fwhm_pix': 7.300}
 }
 
-miri_empirical_ee_apertures_arcsec = {
-    'F560W': {'FWHM': 0.207, 'ee': 0.59},
-    'F770W': {'FWHM': 0.269, 'ee': 0.62},
-    'F1000W': {'FWHM': 0.328, 'ee': 0.71},
-    'F1130W': {'FWHM': 0.375, 'ee': 0.73},
-    'F1280W': {'FWHM': 0.420, 'ee': 0.65},
-    'F1500W': {'FWHM': 0.488, 'ee': 0.77},
-    'F1800W': {'FWHM': 0.591, 'ee': 0.74},
-    'F2100W': {'FWHM': 0.674, 'ee': 0.72},
-    'F2550W': {'FWHM': 0.803, 'ee': 0.68}
+miri_empirical_ee_rad = {
+    'F560W': {'rad_pix': 2.296, 'ee': 0.65},
+    'F770W': {'rad_pix': 2.950, 'ee': 0.65},
+    'F1000W': {'rad_pix': 2.782, 'ee': 0.65},
+    'F1130W': {'rad_pix': 2.878, 'ee': 0.65},
+    'F1280W': {'rad_pix': None, 'ee': 0.65},
+    'F1500W': {'rad_pix': 3.551, 'ee': 0.65},
+    'F1800W': {'rad_pix': 4.461, 'ee': 0.65},
+    'F2100W': {'rad_pix': 4.603, 'ee': 0.65},
+    'F2550W': {'rad_pix': 5.810, 'ee': 0.65}
 }
 
 # # aperture correction of Miri is just 50 % because a 50 % EE is used

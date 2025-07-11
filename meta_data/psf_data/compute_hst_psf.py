@@ -21,9 +21,18 @@ super_sample_factor_acs_wfc = 4
 super_sample_factor_wfc3_uvis = 4
 super_sample_factor_wfc3_ir = 4
 
+
+# encirceled energy values
+ee_values = [0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 0.99]
+ee_str = ['25', '30', '35', '40', '45', '50', '55', '60', '65', '70', '75', '80', '85', '90', '95', '99']
+
+
+
 acs_wfc_band_list = phangs_info.acs_wfc_psf_band_list
 wfc3_uv_band_list = phangs_info.wfc3_uv_psf_band_list
 wfc3_ir_band_list = phangs_info.wfc3_ir_psf_band_list
+
+
 
 
 psf_dict_hst_acs_wfc = {}
@@ -57,12 +66,16 @@ for band in acs_wfc_band_list:
 
     plt.plot(rad_profile_stat_dict['rad'], rad_profile_stat_dict['profile'] / max(rad_profile_stat_dict['profile']), color='green')
 
-    ee_values = phot_tools.ProfileTools.get_src_ee(data=mean_psf, x_pos=central_x_pos, y_pos=central_y_pos,
-                                                max_rad=max_rad, ee_values=[0.25, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95,  0.99],
+    ee_values_arcsec = phot_tools.ProfileTools.get_src_ee(data=mean_psf, x_pos=central_x_pos, y_pos=central_y_pos,
+                                                max_rad=max_rad, ee_values=ee_values,
                                                 pix_scale=(pixel_size_acs_wfc / super_sample_factor_acs_wfc),
                                                 err=None)
+    ee_values_pix= phot_tools.ProfileTools.get_src_ee(data=mean_psf, x_pos=central_x_pos, y_pos=central_y_pos,
+                                                max_rad=max_rad, ee_values=ee_values,
+                                                pix_scale=1/super_sample_factor_acs_wfc,
+                                                err=None)
 
-    print(band, ee_values[1], ee_values[4], rad_profile_stat_dict['gaussian_fwhm'])
+    print(band, ee_values_arcsec[5], ee_values_arcsec[11], rad_profile_stat_dict['gaussian_fwhm'])
     psf_dict_hst_acs_wfc.update({
         '%s' % band: {
             # the PSF itself
@@ -77,17 +90,13 @@ for band in acs_wfc_band_list:
             'gaussian_amp': rad_profile_stat_dict['gaussian_amp'],
             'gaussian_mean': rad_profile_stat_dict['gaussian_mean'],
             'gaussian_std': rad_profile_stat_dict['gaussian_std'],
-            # encircled energy values
-            'ee_25percent': ee_values[0],
-            'ee_50percent': ee_values[1],
-            'ee_60percent': ee_values[2],
-            'ee_70percent': ee_values[3],
-            'ee_80percent': ee_values[4],
-            'ee_90percent': ee_values[5],
-            'ee_95percent': ee_values[6],
-            'ee_99percent': ee_values[7],
         }
     })
+    # encircled energy values
+    for idx_ee, ee in enumerate(ee_str):
+        psf_dict_hst_acs_wfc[band].update({'ee_%s_arcsec' % ee: ee_values_arcsec[idx_ee]})
+        psf_dict_hst_acs_wfc[band].update({'ee_%s_pix' % ee: ee_values_pix[idx_ee]})
+
 
 # save dictionary
 if not os.path.isdir('data_output'):
@@ -118,18 +127,22 @@ for band in wfc3_uv_band_list:
     plt.plot(rad_profile_stat_dict['rad'], rad_profile_stat_dict['profile'] / max(rad_profile_stat_dict['profile']),
              color='blue')
 
-    ee_values = phot_tools.ProfileTools.get_src_ee(data=mean_psf, x_pos=central_x_pos, y_pos=central_y_pos,
-                                                max_rad=max_rad, ee_values=[0.25, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99],
+    ee_values_arcsec = phot_tools.ProfileTools.get_src_ee(data=mean_psf, x_pos=central_x_pos, y_pos=central_y_pos,
+                                                max_rad=max_rad, ee_values=ee_values,
                                                 pix_scale=(pixel_size_wfc3_uvis / super_sample_factor_wfc3_uvis),
                                                 err=None)
+    ee_values_pix= phot_tools.ProfileTools.get_src_ee(data=mean_psf, x_pos=central_x_pos, y_pos=central_y_pos,
+                                                max_rad=max_rad, ee_values=ee_values,
+                                                pix_scale=1/super_sample_factor_wfc3_uvis,
+                                                err=None)
 
-    print(band, ee_values[1], ee_values[4], rad_profile_stat_dict['gaussian_fwhm'])
+    print(band, ee_values_arcsec[5], ee_values_arcsec[11], rad_profile_stat_dict['gaussian_fwhm'])
     psf_dict_hst_wfc3_uv.update({
         '%s' % band: {
             # the PSF itself
             'over_sampled_psf': mean_psf,
             'pixel_scale_psf_over_sampled': (pixel_size_wfc3_uvis / super_sample_factor_wfc3_uvis),
-            'n_over_sampled': super_sample_factor_wfc3_uvis,
+            'n_over_sampled' : super_sample_factor_wfc3_uvis,
             # parametrization of the radial profile
             'radius_arcsec': rad_profile_stat_dict['rad'],
             'psf_profile': rad_profile_stat_dict['profile'],
@@ -138,17 +151,12 @@ for band in wfc3_uv_band_list:
             'gaussian_amp': rad_profile_stat_dict['gaussian_amp'],
             'gaussian_mean': rad_profile_stat_dict['gaussian_mean'],
             'gaussian_std': rad_profile_stat_dict['gaussian_std'],
-            # encircled energy values
-            'ee_25percent': ee_values[0],
-            'ee_50percent': ee_values[1],
-            'ee_60percent': ee_values[2],
-            'ee_70percent': ee_values[3],
-            'ee_80percent': ee_values[4],
-            'ee_90percent': ee_values[5],
-            'ee_95percent': ee_values[6],
-            'ee_99percent': ee_values[7],
         }
     })
+    # encircled energy values
+    for idx_ee, ee in enumerate(ee_str):
+        psf_dict_hst_wfc3_uv[band].update({'ee_%s_arcsec' % ee: ee_values_arcsec[idx_ee]})
+        psf_dict_hst_wfc3_uv[band].update({'ee_%s_pix' % ee: ee_values_pix[idx_ee]})
 
 with open('data_output/hst_wfc3_uv_psf_dict.npy', 'wb') as file_name:
     pickle.dump(psf_dict_hst_wfc3_uv, file_name)
@@ -173,18 +181,22 @@ for band in wfc3_ir_band_list:
     plt.plot(rad_profile_stat_dict['rad'], rad_profile_stat_dict['profile'] / max(rad_profile_stat_dict['profile']),
              color='red')
 
-    ee_values = phot_tools.ProfileTools.get_src_ee(data=mean_psf, x_pos=central_x_pos, y_pos=central_y_pos,
-                                                max_rad=max_rad, ee_values=[0.25, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99],
+    ee_values_arcsec = phot_tools.ProfileTools.get_src_ee(data=mean_psf, x_pos=central_x_pos, y_pos=central_y_pos,
+                                                max_rad=max_rad, ee_values=ee_values,
                                                 pix_scale=(pixel_size_wfc3_ir / super_sample_factor_wfc3_ir),
                                                 err=None)
+    ee_values_pix= phot_tools.ProfileTools.get_src_ee(data=mean_psf, x_pos=central_x_pos, y_pos=central_y_pos,
+                                                max_rad=max_rad, ee_values=ee_values,
+                                                pix_scale=1/super_sample_factor_wfc3_ir,
+                                                err=None)
 
-    print(band, ee_values[1], ee_values[4], rad_profile_stat_dict['gaussian_fwhm'])
+    print(band, ee_values_arcsec[5], ee_values_arcsec[11], rad_profile_stat_dict['gaussian_fwhm'])
     psf_dict_hst_wfc3_ir.update({
         '%s' % band: {
             # the PSF itself
             'over_sampled_psf': mean_psf,
             'pixel_scale_psf_over_sampled': (pixel_size_wfc3_ir / super_sample_factor_wfc3_ir),
-            'n_over_sampled': super_sample_factor_wfc3_ir,
+            'n_over_sampled' : super_sample_factor_wfc3_ir,
             # parametrization of the radial profile
             'radius_arcsec': rad_profile_stat_dict['rad'],
             'psf_profile': rad_profile_stat_dict['profile'],
@@ -193,17 +205,12 @@ for band in wfc3_ir_band_list:
             'gaussian_amp': rad_profile_stat_dict['gaussian_amp'],
             'gaussian_mean': rad_profile_stat_dict['gaussian_mean'],
             'gaussian_std': rad_profile_stat_dict['gaussian_std'],
-            # encircled energy values
-            'ee_25percent': ee_values[0],
-            'ee_50percent': ee_values[1],
-            'ee_60percent': ee_values[2],
-            'ee_70percent': ee_values[3],
-            'ee_80percent': ee_values[4],
-            'ee_90percent': ee_values[5],
-            'ee_95percent': ee_values[6],
-            'ee_99percent': ee_values[7],
         }
     })
+    # encircled energy values
+    for idx_ee, ee in enumerate(ee_str):
+        psf_dict_hst_wfc3_ir[band].update({'ee_%s_arcsec' % ee: ee_values_arcsec[idx_ee]})
+        psf_dict_hst_wfc3_ir[band].update({'ee_%s_pix' % ee: ee_values_pix[idx_ee]})
 
 with open('data_output/hst_wfc3_ir_psf_dict.npy', 'wb') as file_name:
     pickle.dump(psf_dict_hst_wfc3_ir, file_name)

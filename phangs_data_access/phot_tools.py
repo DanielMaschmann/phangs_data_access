@@ -388,6 +388,7 @@ class ProfileTools:
     def get_rad_profile_from_img(img, wcs, ra, dec, max_rad_arcsec, img_err=None, img_mask=None, norm_profile=True, method='exact'):
         # get central pixels
         central_pos = wcs.world_to_pixel(SkyCoord(ra=ra * u.deg, dec=dec * u.deg))
+
         max_rad_pix = helper_func.CoordTools.transform_world2pix_scale(length_in_arcsec=max_rad_arcsec, wcs=wcs, dim=0)
         # get pixel_scale
         pixel_scale = wcs.proj_plane_pixel_scales()[0].value * 3600
@@ -419,8 +420,8 @@ class ProfileTools:
         mask_pixels_in_slit = helper_func.GeometryTools.select_img_pix_along_line(data=data, x_pos=x_pos, y_pos=y_pos,
                                                                                   angle=angle)
 
-        x_pixels = np.arange(data.shape[0])
-        y_pixels = np.arange(data.shape[1])
+        x_pixels = np.arange(data.shape[1])
+        y_pixels = np.arange(data.shape[0])
         x_mesh, y_mesh = np.meshgrid(x_pixels, y_pixels)
 
         radial_map = np.sqrt((x_mesh - x_pos) ** 2 + (y_mesh - y_pos) ** 2)
@@ -437,7 +438,7 @@ class ProfileTools:
         profile_mask = mask[mask_pixels_in_slit]
         profile_data = data[mask_pixels_in_slit]
         radius_data = radial_map[mask_pixels_in_slit]
-
+        #
         # print(profile_mask)
         # import matplotlib.pyplot as plt
         #
@@ -592,14 +593,31 @@ class ProfileTools:
             #              color='gray')
 
             # fit
-            gaussian_fit_dict = helper_func.FitTools.fit_gauss(
-                x_data=rad_profile_dict[str(idx)]['radius_data'][mask_pixels_to_fit],
-                y_data=rad_profile_dict[str(idx)]['profile_data'][mask_pixels_to_fit],
-                y_data_err=rad_profile_dict[str(idx)]['profile_err'][mask_pixels_to_fit],
-                amp_guess=max_value_in_center, mu_guess=0, sig_guess=std_pix,
-                lower_amp=lower_amp, upper_amp=upper_amp,
-                lower_mu=std_pix * -5, upper_mu=std_pix * 5,
-                lower_sigma=std_pix, upper_sigma=std_pix * upper_sig_fact)
+            try:
+                gaussian_fit_dict = helper_func.FitTools.fit_gauss(
+                    x_data=rad_profile_dict[str(idx)]['radius_data'][mask_pixels_to_fit],
+                    y_data=rad_profile_dict[str(idx)]['profile_data'][mask_pixels_to_fit],
+                    y_data_err=rad_profile_dict[str(idx)]['profile_err'][mask_pixels_to_fit],
+                    amp_guess=max_value_in_center, mu_guess=0, sig_guess=std_pix,
+                    lower_amp=lower_amp, upper_amp=upper_amp,
+                    lower_mu=std_pix * -5, upper_mu=std_pix * 5,
+                    lower_sigma=std_pix, upper_sigma=std_pix * upper_sig_fact)
+                amp_list.append(gaussian_fit_dict['amp'])
+                mu_list.append(gaussian_fit_dict['mu'])
+                sig_list.append(gaussian_fit_dict['sig'])
+
+                amp_err_list.append(gaussian_fit_dict['amp_err'])
+                mu_err_list.append(gaussian_fit_dict['mu_err'])
+                sig_err_list.append(gaussian_fit_dict['sig_err'])
+
+            except RuntimeError:
+                amp_list.append(np.nan)
+                mu_list.append(np.nan)
+                sig_list.append(np.nan)
+
+                amp_err_list.append(np.nan)
+                mu_err_list.append(np.nan)
+                sig_err_list.append(np.nan)
 
             # plt.scatter(rad_profile_dict['list_angles'][idx], gaussian_fit_dict['sig'])
 
@@ -614,13 +632,13 @@ class ProfileTools:
             #     plt.plot(dummy_rad, gauss)
 
             # get the fit results
-            amp_list.append(gaussian_fit_dict['amp'])
-            mu_list.append(gaussian_fit_dict['mu'])
-            sig_list.append(gaussian_fit_dict['sig'])
-
-            amp_err_list.append(gaussian_fit_dict['amp_err'])
-            mu_err_list.append(gaussian_fit_dict['mu_err'])
-            sig_err_list.append(gaussian_fit_dict['sig_err'])
+            # amp_list.append(gaussian_fit_dict['amp'])
+            # mu_list.append(gaussian_fit_dict['mu'])
+            # sig_list.append(gaussian_fit_dict['sig'])
+            #
+            # amp_err_list.append(gaussian_fit_dict['amp_err'])
+            # mu_err_list.append(gaussian_fit_dict['mu_err'])
+            # sig_err_list.append(gaussian_fit_dict['sig_err'])
 
         # plt.show()
 
@@ -674,7 +692,7 @@ class ProfileTools:
             # compute the maximal flux inside the 1 sigma PSF environment
             src_region_stats = ApertTools.get_apert_stats(
                 data=topo_dict['img'], data_err=None, x_pos=x_center, y_pos=ycenter,
-                aperture_rad=topo_dict['psf_std_pix'])
+                aperture_rad_pix=topo_dict['psf_std_pix'])
 
             amp = src_region_stats.max
             mu = 0
@@ -776,10 +794,10 @@ class ProfileTools:
         central_apert_stats_source = ApertTools.get_sky_apert_stats(data=img - bkg, data_err=img_err,
                                                                                wcs=wcs,
                                                                                ra=ra, dec=dec,
-                                                                               aperture_rad=radius_of_interes)
+                                                                               aperture_rad_arcsec=radius_of_interes)
         central_apert_stats_bkg = ApertTools.get_sky_apert_stats(data=bkg, data_err=img_err, wcs=wcs,
                                                                             ra=ra, dec=dec,
-                                                                            aperture_rad=radius_of_interes)
+                                                                            aperture_rad_arcsec=radius_of_interes)
 
         amp_list = []
         mu_list = []
@@ -1023,7 +1041,7 @@ class ApertTools:
         if obs == 'nircam':
             return phys_params.nircam_aperture_rad_pix[band]
         if obs == 'miri':
-            return phys_params.miri_empirical_fwhm[band]['fwhm_pix']
+            return PSFTools.load_jwst_psf_dict(band=band, instrument='miri')['ee_65_pix']
 
     @staticmethod
     def get_standard_ap_rad_arcsec(obs, band, wcs):
@@ -1032,7 +1050,20 @@ class ApertTools:
         if obs == 'nircam':
             return wcs.proj_plane_pixel_scales()[0].value * 3600 * phys_params.nircam_aperture_rad_pix[band]
         if obs == 'miri':
-            return phys_params.miri_empirical_fwhm[band]['fwhm_arcsec']
+            return PSFTools.load_jwst_psf_dict(band=band, instrument='miri')['ee_65_arcsec']
+
+    @staticmethod
+    def get_standard_ap_corr_fact(obs, band, target=None):
+        if obs == 'hst':
+            return 10 ** (phys_params.hst_broad_band_aperture_4px_corr[target][band] / -2.5)
+        if obs == 'nircam':
+            return 10 ** (phys_params.nircam_aperture_corr[band]['ap_corr'] / -2.5)
+        if obs == 'miri':
+            return 1 / 0.65
+
+
+
+
 
     @staticmethod
     def get_standard_bkg_annulus_rad_pix(obs, band=None):
@@ -1116,7 +1147,7 @@ class ApertTools:
 
     @staticmethod
     def compute_apert_photometry(apert_rad_arcsec, bkg_rad_annulus_in_arcsec, bkg_rad_annulus_out_arcsec, data,
-                                 data_err, wcs, ra, dec, mask=None, sigma_clip_sig=3, sigma_clip_maxiters=5, sum_method='exact'):
+                                 data_err, wcs, ra, dec, mask=None, sigma_clip_sig=3, sigma_clip_maxiters=10, sum_method='exact'):
 
         # get coordinates
         coords = SkyCoord(ra=ra*u.deg, dec=dec*u.deg)
@@ -1137,21 +1168,19 @@ class ApertTools:
         bkg_rad_annulus_out_pix = helper_func.CoordTools.transform_world2pix_scale(
             length_in_arcsec=bkg_rad_annulus_out_arcsec, wcs=wcs).value
 
-        bkg_10_clip, bkg_90_clip, bkg_ok_flag = ApertTools.compute_annulus_quantiles(
+        bkg_16_clip, bkg_84_clip, bkg_ok_flag = ApertTools.compute_annulus_quantiles(
             coords_pix=coords_pix, annulus_rad_in_pix=bkg_rad_annulus_in_pix,
             annulus_rad_out_pix=bkg_rad_annulus_out_pix, sum_method=sum_method, data=data, sig_clip=sig_clip,
-            quantile_low=0.1, quantile_high=0.9)
+            quantile_low=0.16, quantile_high=0.84)
 
         # calculate stats in the aperture
         apert_stats = ApertTools.get_sky_apert_stats(
             data=data, data_err=data_err, wcs=wcs, ra=ra, dec=dec, aperture_rad_arcsec=apert_rad_arcsec, mask=mask,
             sig_clip=None, sum_method=sum_method)
 
-
         # get the surfaces of aperture and anulus
         area_apert = apert_stats.sum_aper_area.value
         area_annulus = bkg_stats.sum_aper_area.value
-
 
         # flux is simply the sum inside the aperture
         apert_flux = apert_stats.sum
@@ -1172,8 +1201,6 @@ class ApertTools:
 
         # compute background in aperture
         apert_bkg_median = bkg_median * area_apert
-        apert_bkg_10_clip = bkg_10_clip * area_apert
-        apert_bkg_90_clip = bkg_90_clip * area_apert
 
         # the flux of the src is the total flux from the aperture minus the bkg estimation
         src_flux = apert_flux - apert_bkg_median
@@ -1191,12 +1218,11 @@ class ApertTools:
 
         # calculate the errors
         """
-        include an additional term that reflects the variation in measurement when using the 10th and 90th percentiles
+        include an additional term that reflects the variation in measurement when using the 16th and 84th percentiles
          of the background. 
-        This difference corresponds to 4.6 sigma if the distribution of background annulus values is Gaussian.
-        Therefore, we divide by 4.6 to obtain the 1 sigma uncertainty
         """
-        bkg_err = (apert_bkg_90_clip - apert_bkg_10_clip) / 4.6
+
+        bkg_err = (bkg_84_clip - bkg_16_clip) / 2
 
         # the two last terms can be identified in EQ1 of https://wise2.ipac.caltech.edu/staff/fmasci/ApPhotUncert.pdf
         src_flux_err = np.sqrt(
@@ -1205,7 +1231,6 @@ class ApertTools:
             # uncertainty due to background fluctuation
             pow(bkg_err, 2.) +
             (pow(bkg_err * area_apert, 2) / area_annulus) * np.pi / 2)
-
 
         flux_dict = {
             'src_flux': src_flux,
@@ -1221,8 +1246,8 @@ class ApertTools:
             'bkg_min': bkg_min,
             'bkg_max': bkg_max,
 
-            'bkg_10_clip': bkg_10_clip,
-            'bkg_90_clip': bkg_90_clip,
+            'bkg_16_clip': bkg_16_clip,
+            'bkg_84_clip': bkg_84_clip,
             'bkg_ok_flag': bkg_ok_flag
         }
 
@@ -1405,7 +1430,7 @@ class ApertTools:
                              sigma_clip=sig_clip, mask=mask, sum_method=sum_method)
 
     @staticmethod
-    def get_apert_stats(data, data_err, x_pos, y_pos, aperture_rad):
+    def get_apert_stats_old(data, data_err, x_pos, y_pos, aperture_rad):
         """
 
         Parameters
@@ -1922,12 +1947,130 @@ class ScaleTools:
         residual = data
         return scaling_result_list, residual, kernel_sizes_list
 
+    @staticmethod
+    def constrained_diffusion_decomposition_specific_scales(data, scales_pix_lo, scales_pix_hi,
+                                                            e_rel=3e-2,
+                                                            max_n=None, sm_mode='reflect', verbosity=False):
+
+        """
+        perform constrained diffusion decomposition as explained in Li+2022 (2022ApJS..259...59L)
+        This specific version of this method was done for Hoffman+ in prep 2025 or 2026
 
 
 
+        Parameters
+        ----------
+        data: ndarray
+            input image
+        scales_pix_lo, scales_pix_hi: ndarray
 
+        e_rel: float
+            relative error, a smaller e_rel means a better
+            accuracy yet a larger computational cost
+        max_n: int or None
+            maximum number of channels. Channel number
+            ranges from 0 to max_n
+            if None, the program will calculate it automatically
+        sm_mode: str
+            {'reflect', 'constant', 'nearest', 'mirror', 'wrap'}, optional The mode
+            parameter determines how the input array is extended beyond its
+            boundaries in the convolution operation. Default is 'reflect'.
+        verbosity: bool
+            flag if progress printing is wanted
 
+        Returns
+        -------
+        scaling_result_list: list of ndarray
+            returns a list of constained diffusion decomposition. Assuming that the input
+            is a n-dimensional array, then the output would be a n+1 dimensional
+            array. The added dimension is the scale. Component maps can be accessed
+            via output[n], where n is the channel number.
 
+                output[i] contains structures of sizes larger than 2**i pixels
+                yet smaller than 2**(i+1) pixels.
+        residual: ndarray
+            structures too large to be contained in the results
+        kernel_sizes_list: list
+            all kernel sizes
+
+        """
+
+        ntot = int(len(scales_pix_lo))
+
+        ##ntot = int(log(min(data.shape))/log(2) - 1)
+        # the total number of scale map
+
+        kernel_sizes = []
+        result = []
+
+        if max_n is not None:
+            ntot = np.min([ntot, max_n])
+        print("ntot", ntot)
+
+        diff_image = data.copy() * 0
+
+        for i in range(ntot):
+            print("i =", i)
+            channel_image = data.copy() * 0
+
+            # computing the step size
+
+            # scale_end = float(pow(2, i + 1))
+            # scale_beginning = float(pow(2, i))
+            scale_end = scales_pix_hi[i]
+            scale_beginning = scales_pix_lo[i]
+            print('scale_beginning, scale_end ', scale_beginning, scale_end)
+            t_end = scale_end ** 2 / 2  # t at the end of this scale
+            t_beginning = scale_beginning ** 2 / 2  # t at the beginning of this scale
+
+            print('t_end ', t_end)
+            print('t_beginning ', t_beginning)
+            if i == 0:
+                delta_t_max = t_beginning * 0.1
+            else:
+                delta_t_max = t_beginning * e_rel
+
+            print(' delta_t_max ', delta_t_max)
+
+            niter = int((t_end - t_beginning) / delta_t_max + 0.5)
+            print('niter ', niter)
+
+            delta_t = (t_end - t_beginning) / niter
+            print('delta_t ', delta_t)
+
+            kernel_size = np.sqrt(2 * delta_t)  # size of gaussian kernel
+            print("kernel_size", kernel_size)
+            for kk in range(niter):
+                smooth_image = ndimage.gaussian_filter(data, kernel_size,
+                                                       mode=sm_mode)
+                sm_image_1 = np.minimum(data, smooth_image)
+                sm_image_2 = np.maximum(data, smooth_image)
+
+                diff_image_1 = data - sm_image_1
+                diff_image_2 = data - sm_image_2
+
+                diff_image = diff_image * 0
+
+                positions_1 = np.where(np.logical_and(diff_image_1 > 0, data > 0))
+                positions_2 = np.where(np.logical_and(diff_image_2 < 0, data < 0))
+
+                diff_image[positions_1] = diff_image_1[positions_1]
+                diff_image[positions_2] = diff_image_2[positions_2]
+
+                channel_image = channel_image + diff_image
+
+                data = data - diff_image
+                # data = ndimage.gaussian_filter(data, kernel_size)     # !!!!
+                # _____________________________________________________________
+                # Additional smoothing?
+                # ____________________________________________________________
+                # Arcsin transfrom
+                # ____________________________________________________________
+            result.append(channel_image)
+            kernel_sizes.append(kernel_size)
+            # residual.append(data)
+        residual = data
+        return result, residual, kernel_sizes
 
 
 class PhotToolsOld:

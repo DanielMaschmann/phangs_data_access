@@ -333,7 +333,7 @@ nirspec_gratings = {
 # hst
 # The aperture sizes are 4 pixels for each band. The background is estimated between 7 and 9 pixels
 # this is explained in Deger+2022 (2022MNRAS.510...32D)
-hst_aperture_rad_pix = {'F275W': 4, 'F336W': 4, 'F435W': 4, 'F438W': 4, 'F555W': 4,  'F547M': 4, 'F657N': 4, 'F658N': 4, 'F814W': 4}
+hst_aperture_rad_pix = {'F275W': 4, 'F336W': 4, 'F435W': 4, 'F438W': 4, 'F555W': 4,  'F547M': 4, 'F657N': 4, 'F658N': 4, 'F689M': 4, 'F814W': 4}
 
 hst_bkg_annulus_radii_pix = {'rad_in': 7., 'rad_out': 9.}
 
@@ -460,7 +460,11 @@ nircam_empirical_ee_apertures_arcsec = {
 }
 
 
-nircam_aperture_rad_pix = {'F150W': 4, 'F200W': 4, 'F300M': 2, 'F335M': 2, 'F360M': 2}
+nircam_aperture_rad_pix = {
+    'F070W': 4, 'F090W': 4, 'F115W': 4, 'F140M': 4, 'F150W': 4, 'F162M': 4, 'F164N': 4, 'F182M': 4, 'F187N': 4,
+    'F200W': 4, 'F210M': 4, 'F212N': 4, 'F250M': 2, 'F277W': 2, 'F300M': 2, 'F323N': 2, 'F335M': 2, 'F356W': 2,
+    'F360M': 2, 'F405N': 2, 'F410M': 2, 'F430M': 2, 'F444W': 2, 'F460M': 2, 'F466N': 2, 'F470N': 2, 'F480M': 2,
+}
 
 nircam_bkg_annulus_pix = {
     'rad_in': 8.,

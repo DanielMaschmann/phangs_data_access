@@ -1298,7 +1298,26 @@ class PhotAccess:
 
         return morph_dict
 
-    def compute_ci(self, ra, dec, band, instrument, cutout_size,
+
+
+    def compute_ci(self, ra, dec, band, telescope, rad_1_pix=1, rad_2_pix=3
+                   ):
+
+        img = getattr(self,'%s_bands_data' % telescope)['%s_data_img' % band]
+        wcs = getattr(self,'%s_bands_data' % telescope)['%s_wcs_img' % band]
+
+        rad_1_arcsec = helper_func.CoordTools.transform_pix2world_scale(length_in_pix=rad_1_pix, wcs=wcs)
+        rad_2_arcsec = helper_func.CoordTools.transform_pix2world_scale(length_in_pix=rad_2_pix, wcs=wcs)
+
+        return phot_tools.ApertTools.compute_annulus_ci(img=img,
+                                                 img_err=None, wcs=wcs,
+            ra=ra, dec=dec, rad_1_arcsec=rad_1_arcsec, rad_2_arcsec=rad_2_arcsec)
+
+
+
+
+
+    def compute_ci_old(self, ra, dec, band, instrument, cutout_size,
                         src_stats_rad_factor=3, bkg_img_size_factor=60, bkg_box_size_factor=2,
                         bkg_filter_size_factor=1, bkg_do_sigma_clip=True, bkg_sigma=3.0, bkg_maxiters=10,
                         bkg_method='SExtractorBackground'):

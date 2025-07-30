@@ -28,14 +28,18 @@ class ClusterCatAccess:
 
     """
 
-    def __init__(self, phangs_hst_cluster_cat_release='phangs_hst_cc_dr4_cr3_ground_based_ha',
-                 phangs_hst_cluster_cat_ver='v1', phangs_hst_cluster_cat_extend_sed_ver='HST_Ha_nircam'):
+    def __init__(self,
+                 phangs_hst_cluster_cat_sed_version='ground_based_ha',
+                 phangs_hst_cluster_cat_ver='v1',
+                 phangs_hst_cluster_cat_extend_sed_ver='HST_Ha_nircam'):
         """
 
         """
         self.phangs_hst_cluster_cat_data_path = (
             phangs_access_config.phangs_config_dict)['phangs_hst_cluster_cat_data_path']
-        self.phangs_hst_cluster_cat_release = phangs_hst_cluster_cat_release
+        self.phangs_hst_cluster_cat_release = (
+            phangs_access_config.phangs_config_dict)['phangs_hst_cluster_cat_release']
+        self.phangs_hst_cluster_cat_sed_version = phangs_hst_cluster_cat_sed_version
         self.phangs_hst_cluster_cat_ver = phangs_hst_cluster_cat_ver
         self.phangs_hst_cluster_cat_extend_sed_ver = phangs_hst_cluster_cat_extend_sed_ver
 
@@ -71,9 +75,16 @@ class ClusterCatAccess:
         else:
             instruments += 'uvis'
 
+        if cat_type in ['sed', 'obs-sed']:
+            if self.phangs_hst_cluster_cat_sed_version == 'ground_based_ha':
+                cat_type += '-ground-halpha'
+            elif self.phangs_hst_cluster_cat_sed_version == 'hst_ha':
+                cat_type += '-hst-halpha'
+
+
         if cluster_class == 'candidates':
-            file_string = Path('hlsp_phangs-cat_hst_%s_%s_multi_%s_obs-sed-candidates.fits' %
-                               (instruments, target, self.phangs_hst_cluster_cat_ver))
+            file_string = Path('hlsp_phangs-cat_hst_%s_%s_multi_%s_%s-candidates.fits' %
+                               (instruments, target, self.phangs_hst_cluster_cat_ver, cat_type))
 
         else:
             if classify == 'human':
@@ -94,11 +105,11 @@ class ClusterCatAccess:
                                % (instruments, target, self.phangs_hst_cluster_cat_ver, cat_type, classify_str,
                                   cluster_str))
 
-        # folder defined by catalog version
-        folder_str = Path(self.phangs_hst_cluster_cat_release + '/catalogs')
-        cluster_dict_path = Path(self.phangs_hst_cluster_cat_data_path) / folder_str
+        cluster_dict_path = (Path(self.phangs_hst_cluster_cat_data_path) /
+                             Path(self.phangs_hst_cluster_cat_release + '/catalogs'))
 
         file_path = cluster_dict_path / file_string
+
         if not os.path.isfile(file_path):
             raise FileNotFoundError('there is no HST cluster catalog for the target ', target,
                                     ' make sure that the file ', file_path, ' exists')
@@ -157,7 +168,7 @@ class ClusterCatAccess:
                         cluster_catalog = hstack([cluster_catalog_obs, cluster_catalog_sed[unique_sed_names]])
                     elif cluster_class == 'candidates':
                         cluster_catalog = self.open_hst_cluster_cat(target=target, classify=classify,
-                                                                    cluster_class=cluster_class, cat_type='obs_sed')
+                                                                    cluster_class=cluster_class, cat_type='obs-sed')
                     else:
                         raise KeyError(cluster_class, ' not understood')
                     self.hst_cc_data.update({str(target) + '_' + classify + '_' + cluster_class: cluster_catalog})
@@ -252,50 +263,58 @@ class ClusterCatAccess:
         """
         self.check_load_hst_cluster_cat(target=target, classify=classify, cluster_class=cluster_class)
         return np.array(self.hst_cc_data[str(target) + '_' + classify + '_' + cluster_class]
-                        ['PHANGS_COLORCOLOR_CLASS_UBVI'])
+                        ['CC_CLASS_%s' % classify.upper()])
+
+    def get_hst_ogc_floyd24_mask(self, target, classify='human', cluster_class='class12'):
+        """
+        Classification based in U-B vs. V-I color-color diagram (See Maschmann et al. 2024) Section 4.4
+        """
+        self.check_load_hst_cluster_cat(target=target, classify=classify, cluster_class=cluster_class)
+        return np.array(self.hst_cc_data[str(target) + '_' + classify + '_' + cluster_class]
+                        ['PHANGS_GLOBULAR_FLOYD24'])
 
     def get_hst_cc_age(self, target, classify='human', cluster_class='class12'):
         """
         Age see Thilker et al. 2024 [unit is Myr]
         """
         self.check_load_hst_cluster_cat(target=target, classify=classify, cluster_class=cluster_class)
-        return np.array(self.hst_cc_data[str(target) + '_' + classify + '_' + cluster_class]['SEDfix_age'])
+        return np.array(self.hst_cc_data[str(target) + '_' + classify + '_' + cluster_class]['PHANGS_SED_AGE'])
 
     def get_hst_cc_age_err(self, target, classify='human', cluster_class='class12'):
         """
         Upper and lower uncertainty of Ages [unit is Myr]
         """
-        return (np.array(self.hst_cc_data[str(target) + '_' + classify + '_' + cluster_class]['SEDfix_age_limlo']),
-                np.array(self.hst_cc_data[str(target) + '_' + classify + '_' + cluster_class]['SEDfix_age_limhi']))
+        return (np.array(self.hst_cc_data[str(target) + '_' + classify + '_' + cluster_class]['PHANGS_SED_AGE_LIMLO']),
+                np.array(self.hst_cc_data[str(target) + '_' + classify + '_' + cluster_class]['PHANGS_SED_AGE_LIMHI']))
 
     def get_hst_cc_mstar(self, target, classify='human', cluster_class='class12'):
         """
         stellar mass [unit M_sun]
         """
         self.check_load_hst_cluster_cat(target=target, classify=classify, cluster_class=cluster_class)
-        return np.array(self.hst_cc_data[str(target) + '_' + classify + '_' + cluster_class]['SEDfix_mass'])
+        return np.array(self.hst_cc_data[str(target) + '_' + classify + '_' + cluster_class]['PHANGS_SED_MASS'])
 
     def get_hst_cc_mstar_err(self, target, classify='human', cluster_class='class12'):
         """
         Upper and lower uncertainty of stellar mass [unit M_sun]
 
         """
-        return (np.array(self.hst_cc_data[str(target) + '_' + classify + '_' + cluster_class]['SEDfix_mass_limlo']),
-                np.array(self.hst_cc_data[str(target) + '_' + classify + '_' + cluster_class]['SEDfix_mass_limhi']))
+        return (np.array(self.hst_cc_data[str(target) + '_' + classify + '_' + cluster_class]['PHANGS_SED_MASS_LIMLO']),
+                np.array(self.hst_cc_data[str(target) + '_' + classify + '_' + cluster_class]['PHANGS_SED_MASS_LIMHI']))
 
     def get_hst_cc_ebv(self, target, classify='human', cluster_class='class12'):
         """
         Dust attenuation measured in E(B-V) [unit mag]
         """
         self.check_load_hst_cluster_cat(target=target, classify=classify, cluster_class=cluster_class)
-        return np.array(self.hst_cc_data[str(target) + '_' + classify + '_' + cluster_class]['SEDfix_ebv'])
+        return np.array(self.hst_cc_data[str(target) + '_' + classify + '_' + cluster_class]['PHANGS_SED_EBV'])
 
     def get_hst_cc_ebv_err(self, target, classify='human', cluster_class='class12'):
         """
         Upper and lower uncertainty of dust attenuation measured in E(B-V) [unit mag]
         """
-        return (np.array(self.hst_cc_data[str(target) + '_' + classify + '_' + cluster_class]['SEDfix_ebv_limlo']),
-                np.array(self.hst_cc_data[str(target) + '_' + classify + '_' + cluster_class]['SEDfix_ebv_limhi']))
+        return (np.array(self.hst_cc_data[str(target) + '_' + classify + '_' + cluster_class]['PHANGS_SED_EBV_LIMLO']),
+                np.array(self.hst_cc_data[str(target) + '_' + classify + '_' + cluster_class]['PHANGS_SED_EBV_LIMHI']))
 
     def get_hst_cc_av(self, target, classify='human', cluster_class='class12'):
         """
@@ -494,7 +513,8 @@ class ClusterCatAccess:
         return np.sqrt(band_mag_err_1 ** 2 + band_mag_err_2 ** 2)
 
     def get_quick_access(self, target='all', classify='human', cluster_class='class123',
-                         save_quick_access=True, reload=False):
+                         save_quick_access=True, reload=False, nircam_data_ver='v1p1p1',
+                         miri_data_ver='v1p1p1', astrosat_data_ver='v1p0'):
         """
         Function to quickly access catalog data. The loaded data are stored locally in a dictionary and one can
         directly access them via key-words
@@ -514,7 +534,7 @@ class ClusterCatAccess:
         quick_access_dict_path = \
             (Path(phangs_access_config.phangs_config_dict['phangs_hst_cluster_cat_quick_access_path']) /
              ('quick_access_dict_%s_%s_%s_%s_%s.npy' %
-              (self.phangs_hst_cluster_cat_release, self.phangs_hst_cluster_cat_ver, target, classify, cluster_class)))
+              (self.phangs_hst_cluster_cat_sed_version, self.phangs_hst_cluster_cat_ver, target, classify, cluster_class)))
 
         if os.path.isfile(quick_access_dict_path) and not reload:
             return np.load(quick_access_dict_path, allow_pickle=True).item()
@@ -531,6 +551,8 @@ class ClusterCatAccess:
             cluster_class_ml = np.array([])
             cluster_class_ml_qual = np.array([])
             ci = np.array([])
+            ogc_floyd24_mask = np.array([])
+
 
             mask_hst_broad_band_covered = np.array([], dtype=bool)
             mask_hst_ha_covered = np.array([], dtype=bool)
@@ -570,14 +592,19 @@ class ClusterCatAccess:
             age = np.array([])
             mstar = np.array([])
             ebv = np.array([])
-            age_old = np.array([])
-            mstar_old = np.array([])
-            ebv_old = np.array([])
+
+            age_limlo = np.array([])
+            mstar_limlo = np.array([])
+            ebv_limlo = np.array([])
+
+            age_limhi = np.array([])
+            mstar_limhi = np.array([])
+            ebv_limhi = np.array([])
 
             if target == 'all':
-                if self.phangs_hst_cluster_cat_release == 'phangs_hst_cc_dr4_cr3_ground_based_ha':
+                if self.phangs_hst_cluster_cat_sed_version == 'ground_based_ha':
                     target_list = phangs_info.hst_cluster_cat_target_list
-                elif self.phangs_hst_cluster_cat_release == 'phangs_hst_cc_dr4_cr3_hst_ha':
+                elif self.phangs_hst_cluster_cat_sed_version == 'hst_ha':
                     target_list = phangs_info.hst_cluster_cat_hst_ha_target_list
                 else:
                     raise KeyError('The catalog version is not understood. '
@@ -633,34 +660,39 @@ class ClusterCatAccess:
                                                                           classify=classify)])
                     ci = np.concatenate([ci, self.get_hst_cc_ci(target=target, cluster_class=cluster_class,
                                                                 classify=classify)])
+                    ogc_floyd24_mask = np.concatenate([ogc_floyd24_mask, self.get_hst_ogc_floyd24_mask(target=target, cluster_class=cluster_class,
+                                                                classify=classify)])
 
                     # coverage mask
                     # load hst broad band obs.
                     if target == 'ngc1510': galaxy_name = 'ngc1512'
                     else: galaxy_name = target
 
-                    phangs_phot = PhotAccess(
-                        phot_target_name=helper_func.FileTools.target_name_no_directions(target=galaxy_name))
+                    phangs_phot = PhotAccess(phot_hst_target_name=galaxy_name, phot_hst_ha_cont_sub_target_name=galaxy_name,
+                        phot_nircam_target_name=helper_func.FileTools.target_name_no_directions(target=galaxy_name),
+                        phot_miri_target_name=helper_func.FileTools.target_name_no_directions(target=galaxy_name),
+                        phot_astrosat_target_name=helper_func.FileTools.target_name_no_directions(target=galaxy_name),
+                        nircam_data_ver=nircam_data_ver, miri_data_ver=miri_data_ver, astrosat_data_ver=astrosat_data_ver)
+
                     phangs_gas = GasAccess(
                         gas_target_name=helper_func.FileTools.target_name_no_directions(target=galaxy_name))
                     phangs_spec = SpecAccess(
                         spec_target_name=helper_func.FileTools.target_name_no_directions(target=galaxy_name))
                     mask_hst_broad_band_covered = (
                         np.concatenate([mask_hst_broad_band_covered,
-                                        phangs_phot.check_coords_covered_by_obs(
-                                            obs='hst', ra=ra_, dec=dec_, band_list=
+                                        phangs_phot.check_coords_covered_by_telescope(
+                                            telescope='hst', ra=ra_, dec=dec_, band_list=
                                             helper_func.ObsTools.get_hst_obs_broad_band_list(
                                                 target=
                                                 helper_func.FileTools.target_name_no_directions(target=galaxy_name)))]))
                     if helper_func.ObsTools.check_hst_ha_obs(
-                            target=helper_func.FileTools.target_name_no_directions(target=galaxy_name)):
+                            target=galaxy_name):
                         mask_hst_ha_covered = (
                             np.concatenate([mask_hst_ha_covered,
-                                            phangs_phot.check_coords_covered_by_obs(
-                                                obs='hst', ra=ra_, dec=dec_, band_list=
+                                            phangs_phot.check_coords_covered_by_telescope(
+                                                telescope='hst', ra=ra_, dec=dec_, band_list=
                                                 [helper_func.ObsTools.get_hst_ha_band(
-                                                    target=
-                                                    helper_func.FileTools.target_name_no_directions(target=galaxy_name))])]))
+                                                    target=galaxy_name)])]))
                     else:
                         mask_hst_ha_covered = np.concatenate([mask_hst_ha_covered, np.zeros(len(ra_), dtype=bool)])
 
@@ -668,11 +700,12 @@ class ClusterCatAccess:
                             target=helper_func.FileTools.target_name_no_directions(target=galaxy_name)):
                         mask_nircam_covered = (
                             np.concatenate([mask_nircam_covered,
-                                            phangs_phot.check_coords_covered_by_obs(
-                                                obs='nircam', ra=ra_, dec=dec_, band_list=
+                                            phangs_phot.check_coords_covered_by_telescope(
+                                                telescope='nircam', ra=ra_, dec=dec_, band_list=
                                                 helper_func.ObsTools.get_nircam_obs_band_list(
                                                     target=
-                                                    helper_func.FileTools.target_name_no_directions(target=galaxy_name)))]))
+                                                    helper_func.FileTools.target_name_no_directions(target=galaxy_name),
+                                                version=nircam_data_ver))]))
                     else:
                         mask_nircam_covered = np.concatenate([mask_nircam_covered, np.zeros(len(ra_), dtype=bool)])
 
@@ -680,12 +713,13 @@ class ClusterCatAccess:
                             target=helper_func.FileTools.target_name_no_directions(target=galaxy_name)):
                         mask_miri_covered = (
                             np.concatenate([mask_miri_covered,
-                                            phangs_phot.check_coords_covered_by_obs(
-                                                obs='miri', ra=ra_, dec=dec_, band_list=
+                                            phangs_phot.check_coords_covered_by_telescope(
+                                                telescope='miri', ra=ra_, dec=dec_, band_list=
                                                 helper_func.ObsTools.get_miri_obs_band_list(
                                                     target=
                                                     helper_func.FileTools.target_name_no_directions(target=
-                                                                                                    galaxy_name)))]))
+                                                                                                    galaxy_name),
+                                                version=miri_data_ver))]))
                     else:
                         mask_miri_covered = np.concatenate([mask_miri_covered, np.zeros(len(ra_), dtype=bool)])
 
@@ -693,12 +727,13 @@ class ClusterCatAccess:
                             target=helper_func.FileTools.target_name_no_directions(target=galaxy_name)):
                         mask_astrosat_covered = (
                             np.concatenate([mask_astrosat_covered,
-                                            phangs_phot.check_coords_covered_by_obs(
-                                                obs='astrosat', ra=ra_, dec=dec_, band_list=
+                                            phangs_phot.check_coords_covered_by_telescope(
+                                                telescope='astrosat', ra=ra_, dec=dec_, band_list=
                                                 helper_func.ObsTools.get_astrosat_obs_band_list(
                                                     target=
                                                     helper_func.FileTools.target_name_no_directions(target=
-                                                                                                    galaxy_name)))]))
+                                                                                                    galaxy_name),
+                                                version=astrosat_data_ver))]))
                     else:
                         mask_astrosat_covered = np.concatenate([mask_astrosat_covered, np.zeros(len(ra_), dtype=bool)])
 
@@ -822,13 +857,20 @@ class ClusterCatAccess:
                     ebv = np.concatenate([ebv, self.get_hst_cc_ebv(target=target, cluster_class=cluster_class,
                                                                    classify=classify)])
 
-                    age_old = np.concatenate([age_old, self.get_hst_cc_ir4_age(target=target, cluster_class=cluster_class,
-                                                                           classify=classify)])
-                    mstar_old = np.concatenate([mstar_old, self.get_hst_cc_ir4_mstar(target=target,
-                                                                                 cluster_class=cluster_class,
-                                                                                 classify=classify)])
-                    ebv_old = np.concatenate([ebv_old, self.get_hst_cc_ir4_ebv(target=target, cluster_class=cluster_class,
-                                                                           classify=classify)])
+                    age_limlo_, age_limhi_ = self.get_hst_cc_age_err(target=target, cluster_class=cluster_class,
+                                                                     classify=classify)
+                    age_limlo = np.concatenate([age_limlo, age_limlo_])
+                    age_limhi = np.concatenate([age_limhi, age_limhi_])
+
+                    mstar_limlo_, mstar_limhi_ = self.get_hst_cc_mstar_err(target=target, cluster_class=cluster_class,
+                                                                     classify=classify)
+                    mstar_limlo = np.concatenate([mstar_limlo, mstar_limlo_])
+                    mstar_limhi = np.concatenate([mstar_limhi, mstar_limhi_])
+
+                    ebv_limlo_, ebv_limhi_ = self.get_hst_cc_ebv_err(target=target, cluster_class=cluster_class,
+                                                                     classify=classify)
+                    ebv_limlo = np.concatenate([ebv_limlo, ebv_limlo_])
+                    ebv_limhi = np.concatenate([ebv_limhi, ebv_limhi_])
 
             quick_access_dict = {
                 'phangs_cluster_id': phangs_cluster_id,
@@ -843,6 +885,7 @@ class ClusterCatAccess:
                 'cluster_class_ml': cluster_class_ml,
                 'cluster_class_ml_qual': cluster_class_ml_qual,
                 'ci': ci,
+                'ogc_floyd24_mask': ogc_floyd24_mask,
                 'mask_hst_broad_band_covered': mask_hst_broad_band_covered,
                 'mask_hst_ha_covered': mask_hst_ha_covered,
                 'mask_nircam_covered': mask_nircam_covered,
@@ -875,9 +918,12 @@ class ClusterCatAccess:
                 'age': age,
                 'mstar': mstar,
                 'ebv': ebv,
-                'age_old': age_old,
-                'mstar_old': mstar_old,
-                'ebv_old': ebv_old,
+                'age_limlo': age_limlo,
+                'age_limhi': age_limhi,
+                'mstar_limlo': mstar_limlo,
+                'mstar_limhi': mstar_limhi,
+                'ebv_limlo': ebv_limlo,
+                'ebv_limhi': ebv_limhi
             }
 
             if save_quick_access:
@@ -906,7 +952,7 @@ class ClusterCatAccess:
         """
 
         hull = np.genfromtxt(Path(phangs_access_config.phangs_config_dict['phangs_hst_cluster_cat_data_path']) /
-                             self.phangs_hst_cluster_cat_release / 'hull' /
+                             self.phangs_hst_cluster_cat_sed_version / 'hull' /
                              ('hlsp_phangs-cat_hst_multi_hull_multi_%s_%s-%s-%s.txt' %
                               (self.phangs_hst_cluster_cat_ver, cluster_region, classify, ccd_type)))
         x_color_hull = hull[:, 0]

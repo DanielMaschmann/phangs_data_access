@@ -1312,6 +1312,7 @@ class ApertTools:
 
         pos = SkyCoord(ra=ra * u.deg, dec=dec * u.deg)
 
+
         apertures = SkyCircularAperture(pos, aperture_rad * u.arcsec)
         if data_err is None:
             mask = ((np.isinf(data)) | (np.isnan(data)))
@@ -1320,11 +1321,11 @@ class ApertTools:
 
         phot = aperture_photometry(data, apertures, wcs=wcs, error=data_err, mask=mask)
 
-        flux = phot['aperture_sum'].value[0]
+        flux = phot['aperture_sum'].value
         if data_err is None:
             flux_err = None
         else:
-            flux_err = phot['aperture_sum_err'].value[0]
+            flux_err = phot['aperture_sum_err'].value
 
         return flux, flux_err
 
@@ -1668,6 +1669,7 @@ class ApertTools:
         flux_1, flux_err_1 = ApertTools.extract_flux_from_circ_aperture(data=img, data_err=img_err, wcs=wcs, ra=ra, dec=dec, aperture_rad=rad_1_arcsec)
         flux_2, flux_err_2 = ApertTools.extract_flux_from_circ_aperture(data=img, data_err=img_err, wcs=wcs, ra=ra, dec=dec, aperture_rad=rad_2_arcsec)
 
+
         ab_mag_1 = helper_func.UnitTools.conv_mjy2ab_mag(flux=flux_1)
         # ab_mag_err_1 = helper_func.UnitTools.conv_mjy_err2vega_err(flux=flux_1, flux_err=flux_err_1)
 
@@ -1746,6 +1748,7 @@ class SrcTools:
             y_src = []
             ra_src = []
             dec_src = []
+            peak_values = np.array([])
         else:
             x_src = list(detected_peaks['x_peak'])
             y_src = list(detected_peaks['y_peak'])
@@ -1753,9 +1756,10 @@ class SrcTools:
                 detected_peaks['x_peak'], detected_peaks['y_peak'])
             ra_src = list(positions_world.ra.deg)
             dec_src = list(positions_world.dec.deg)
+            peak_values = detected_peaks['peak_value']
 
         src_dict = {'x_src': x_src, 'y_src': y_src, 'ra_src': ra_src, 'dec_src': dec_src,
-                     'peak_value': detected_peaks['peak_value']}
+                     'peak_value': peak_values}
 
         return src_dict
 
@@ -2073,6 +2077,67 @@ class ScaleTools:
         return result, residual, kernel_sizes
 
 
+class EWTools:
+
+    @staticmethod
+    def compute_hst_photo_ew(target, left_band, right_band, narrow_band, flux_left_band, flux_right_band,
+                             flux_narrow_band, flux_err_left_band, flux_err_right_band, flux_err_narrow_band):
+        # get the piviot wavelength of both bands
+        pivot_wave_left_band = helper_func.ObsTools.get_hst_band_wave(
+            band=left_band, instrument=helper_func.ObsTools.get_hst_instrument(target=target, band=left_band),
+            wave_estimator='pivot_wave', unit='angstrom')
+        pivot_wave_right_band = helper_func.ObsTools.get_hst_band_wave(
+            band=right_band, instrument=helper_func.ObsTools.get_hst_instrument(target=target, band=right_band),
+            wave_estimator='pivot_wave', unit='angstrom')
+        pivot_wave_narrow_band = helper_func.ObsTools.get_hst_band_wave(
+            band=narrow_band, instrument=helper_func.ObsTools.get_hst_instrument(target=target, band=narrow_band),
+            wave_estimator='pivot_wave', unit='angstrom')
+        # get the effective width of the narrowband filter
+        w_eff_narrow_band = helper_func.ObsTools.get_hst_band_wave(
+            band=narrow_band, instrument=helper_func.ObsTools.get_hst_instrument(target=target, band=narrow_band),
+            wave_estimator='w_eff', unit='angstrom')
+
+        # now change from fluxes to flux densities
+        flux_dens_left_band = flux_left_band * helper_func.UnitTools.get_flux_unit_conv_fact(
+            old_unit='mJy', new_unit='erg A-1 cm-2 s-1', pixel_size=None, band_wave=pivot_wave_left_band)
+        flux_dens_right_band = flux_right_band * helper_func.UnitTools.get_flux_unit_conv_fact(
+            old_unit='mJy', new_unit='erg A-1 cm-2 s-1', pixel_size=None, band_wave=pivot_wave_right_band)
+        flux_dens_narrow_band = flux_narrow_band * helper_func.UnitTools.get_flux_unit_conv_fact(
+            old_unit='mJy', new_unit='erg A-1 cm-2 s-1', pixel_size=None, band_wave=pivot_wave_narrow_band)
+        # convert also uncertainties with factor
+        flux_err_dens_left_band = flux_err_left_band * helper_func.UnitTools.get_flux_unit_conv_fact(
+            old_unit='mJy', new_unit='erg A-1 cm-2 s-1', pixel_size=None, band_wave=pivot_wave_left_band)
+        flux_err_dens_right_band = flux_err_right_band * helper_func.UnitTools.get_flux_unit_conv_fact(
+            old_unit='mJy', new_unit='erg A-1 cm-2 s-1', pixel_size=None, band_wave=pivot_wave_right_band)
+        flux_err_dens_narrow_band = flux_err_narrow_band * helper_func.UnitTools.get_flux_unit_conv_fact(
+            old_unit='mJy', new_unit='erg A-1 cm-2 s-1', pixel_size=None, band_wave=pivot_wave_narrow_band)
+
+        # calculate the weighted continuum flux
+        weight_left_band = (pivot_wave_narrow_band - pivot_wave_left_band) / (pivot_wave_right_band - pivot_wave_left_band)
+        weight_right_band = (pivot_wave_right_band - pivot_wave_narrow_band) / (pivot_wave_right_band - pivot_wave_left_band)
+        weighted_continuum_flux_dens = weight_left_band * flux_dens_left_band + weight_right_band * flux_dens_right_band
+        # error propagation
+        weighted_continuum_flux_err_dens = np.sqrt(flux_err_dens_left_band ** 2 + flux_err_dens_right_band ** 2)
+
+        # EW estimation taken from definition at https://en.wikipedia.org/wiki/Equivalent_width
+        # be aware that the emission features have negative and absorption features have positive EW!
+        ew = ((weighted_continuum_flux_dens - flux_dens_narrow_band) / weighted_continuum_flux_dens) * w_eff_narrow_band
+        # uncertainty estimated via error propagation if this is not clear to you look here:
+        # https://en.wikipedia.org/wiki/Propagation_of_uncertainty
+        er_err = np.sqrt(((w_eff_narrow_band * flux_err_dens_narrow_band) / weighted_continuum_flux_dens) ** 2 +
+                         ((flux_dens_narrow_band * w_eff_narrow_band * weighted_continuum_flux_err_dens) /
+                          (weighted_continuum_flux_dens ** 2)) ** 2)
+
+        return ew, er_err
+
+
+
+
+
+
+
+
+
 class PhotToolsOld:
     """
     old functions which will be soon deleted
@@ -2231,56 +2296,6 @@ class PhotToolsOld:
 
         return structure_df
 
-    @staticmethod
-    def compute_hst_photo_ew(target, left_band, right_band, narrow_band, flux_left_band, flux_right_band,
-                             flux_narrow_band, flux_err_left_band, flux_err_right_band, flux_err_narrow_band):
-        # get the piviot wavelength of both bands
-        pivot_wave_left_band = helper_func.ObsTools.get_hst_band_wave(
-            band=left_band, instrument=helper_func.ObsTools.get_hst_instrument(target=target, band=left_band),
-            wave_estimator='pivot_wave', unit='angstrom')
-        pivot_wave_right_band = helper_func.ObsTools.get_hst_band_wave(
-            band=right_band, instrument=helper_func.ObsTools.get_hst_instrument(target=target, band=right_band),
-            wave_estimator='pivot_wave', unit='angstrom')
-        pivot_wave_narrow_band = helper_func.ObsTools.get_hst_band_wave(
-            band=narrow_band, instrument=helper_func.ObsTools.get_hst_instrument(target=target, band=narrow_band),
-            wave_estimator='pivot_wave', unit='angstrom')
-        # get the effective width of the narrowband filter
-        w_eff_narrow_band = helper_func.ObsTools.get_hst_band_wave(
-            band=narrow_band, instrument=helper_func.ObsTools.get_hst_instrument(target=target, band=narrow_band),
-            wave_estimator='w_eff', unit='angstrom')
-
-        # now change from fluxes to flux densities
-        flux_dens_left_band = flux_left_band * helper_func.UnitTools.get_flux_unit_conv_fact(
-            old_unit='mJy', new_unit='erg A-1 cm-2 s-1', pixel_size=None, band_wave=pivot_wave_left_band)
-        flux_dens_right_band = flux_right_band * helper_func.UnitTools.get_flux_unit_conv_fact(
-            old_unit='mJy', new_unit='erg A-1 cm-2 s-1', pixel_size=None, band_wave=pivot_wave_right_band)
-        flux_dens_narrow_band = flux_narrow_band * helper_func.UnitTools.get_flux_unit_conv_fact(
-            old_unit='mJy', new_unit='erg A-1 cm-2 s-1', pixel_size=None, band_wave=pivot_wave_narrow_band)
-        # convert also uncertainties with factor
-        flux_err_dens_left_band = flux_err_left_band * helper_func.UnitTools.get_flux_unit_conv_fact(
-            old_unit='mJy', new_unit='erg A-1 cm-2 s-1', pixel_size=None, band_wave=pivot_wave_left_band)
-        flux_err_dens_right_band = flux_err_right_band * helper_func.UnitTools.get_flux_unit_conv_fact(
-            old_unit='mJy', new_unit='erg A-1 cm-2 s-1', pixel_size=None, band_wave=pivot_wave_right_band)
-        flux_err_dens_narrow_band = flux_err_narrow_band * helper_func.UnitTools.get_flux_unit_conv_fact(
-            old_unit='mJy', new_unit='erg A-1 cm-2 s-1', pixel_size=None, band_wave=pivot_wave_narrow_band)
-
-        # calculate the weighted continuum flux
-        weight_left_band = (pivot_wave_narrow_band - pivot_wave_left_band) / (pivot_wave_right_band - pivot_wave_left_band)
-        weight_right_band = (pivot_wave_right_band - pivot_wave_narrow_band) / (pivot_wave_right_band - pivot_wave_left_band)
-        weighted_continuum_flux_dens = weight_left_band * flux_dens_left_band + weight_right_band * flux_dens_right_band
-        # error propagation
-        weighted_continuum_flux_err_dens = np.sqrt(flux_err_dens_left_band ** 2 + flux_err_dens_right_band ** 2)
-
-        # EW estimation taken from definition at https://en.wikipedia.org/wiki/Equivalent_width
-        # be aware that the emission features have negative and absorption features have positive EW!
-        ew = ((weighted_continuum_flux_dens - flux_dens_narrow_band) / weighted_continuum_flux_dens) * w_eff_narrow_band
-        # uncertainty estimated via error propagation if this is not clear to you look here:
-        # https://en.wikipedia.org/wiki/Propagation_of_uncertainty
-        er_err = np.sqrt(((w_eff_narrow_band * flux_err_dens_narrow_band) / weighted_continuum_flux_dens) ** 2 +
-                         ((flux_dens_narrow_band * w_eff_narrow_band * weighted_continuum_flux_err_dens) /
-                          (weighted_continuum_flux_dens ** 2)) ** 2)
-
-        return ew, er_err
 
 
 

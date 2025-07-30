@@ -427,6 +427,7 @@ hst_obs_band_dict = {
          'ir': []},
         }
 
+
 jwst_obs_band_dict_v1p1p1 = {
     'ic5332': {'nircam_observed_bands': ['F200W', 'F300M', 'F335M', 'F360M'],
                'miri_observed_bands': ['F770W', 'F1000W', 'F1130W', 'F2100W']},

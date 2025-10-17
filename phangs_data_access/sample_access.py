@@ -5,8 +5,8 @@ from pathlib import Path
 from astropy.table import Table
 import numpy as np
 from phangs_data_access import phangs_access_config, helper_func
-from astroquery.simbad import Simbad
-from astroquery.ipac.ned import Ned
+# from astroquery.simbad import Simbad
+# from astroquery.ipac.ned import Ned
 
 class SampleAccess:
     """

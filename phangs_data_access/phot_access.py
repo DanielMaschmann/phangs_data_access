@@ -132,6 +132,7 @@ class PhotAccess:
         if self.phot_hst_target_name == 'ngc5194':
             hst_data_folder = (Path(phangs_access_config.phangs_config_dict['hst_data_path']) /
                                self.phot_hst_target_name)
+
         else:
 
             hst_data_folder = (Path(phangs_access_config.phangs_config_dict['hst_data_path']) / 'HST_reduced_images' /
@@ -145,6 +146,8 @@ class PhotAccess:
                 elif instrument == 'ir': instrument_str = 'WFC3_IR'; ending = 'drz'
                 else: raise KeyError('instrument is not understood in this context?')
                 file_name = '%s_%s_%s_%s.fits' % (band.upper(), self.phot_hst_target_name.upper(), instrument_str, ending)
+                # file_name = '%s_HST_%s_IVM_%s.fits' % (band.upper(), instrument_str, ending)
+
             else:
                 file_name = '%s_%s_%s_exp_drc_%s.fits' % (
                     helper_func.FileTools.target_names_no_zeros(target=self.phot_hst_target_name),
@@ -221,7 +224,10 @@ class PhotAccess:
         elif (target_name == 'ngc5194') & (instrument == 'miri'): extension = ''
         else: extension = '_anchor'
 
-        file_name = '%s_%s_lv3_%s_i2d%s.fits' % (target_name, instrument, band.lower(), extension)
+        if os.path.isfile(Path(data_folder) / Path('%s_%s_lv3_%s_i2d_align_v1p1p1_ff+rscd.fits' % (target_name, instrument, band.lower()))):
+            file_name = '%s_%s_lv3_%s_i2d_align_v1p1p1_ff+rscd.fits' % (target_name, instrument, band.lower())
+        else:
+            file_name = '%s_%s_lv3_%s_i2d%s.fits' % (target_name, instrument, band.lower(), extension)
 
         return Path(data_folder) / Path(file_name)
 
@@ -265,12 +271,16 @@ class PhotAccess:
                 file_name = self.get_hst_img_file_name(band=band)
 
             if self.phot_hst_target_name == 'ngc5194': hdu_number = 'SCI'
-            else: hdu_number=0
+            else: hdu_number = 0
 
             img_data, img_header, img_wcs = helper_func.FileTools.load_img(file_name=file_name, hdu_number=hdu_number)
             # rescale image to needed unit
-            img_data *= helper_func.UnitTools.get_hst_img_conv_fct(img_header=img_header, img_wcs=img_wcs,
+            if band in list(phys_params.hst_wfc3_ir_bands_wave.keys()):
+                img_data *= helper_func.UnitTools.get_hst_ir_img_conv_fct(band=band, img_header=img_header, img_wcs=img_wcs,
                                                                    flux_unit=flux_unit)
+            else:
+                img_data *= helper_func.UnitTools.get_hst_img_conv_fct(img_header=img_header, img_wcs=img_wcs,
+                                                                       flux_unit=flux_unit)
             self.hst_bands_data.update({'%s_data_img' % band: img_data, '%s_header_img' % band: img_header,
                                         '%s_wcs_img' % band: img_wcs, '%s_unit_img' % band: flux_unit,
                                         '%s_pixel_area_size_sr_img' % band:
@@ -282,9 +292,13 @@ class PhotAccess:
             # here it is important to note that the change unit operation also changes the unit of the error
             if not ('%s_data_err' % band) in self.hst_bands_data.keys():
                 err_file_name = self.get_hst_img_file_name(band=band, file_type='err')
-                if self.phot_hst_target_name == 'ngc5194': hdu_number = 'SCI'
-                else: hdu_number = 0
-                err_data_array, err_header, err_wcs = helper_func.FileTools.load_img(file_name=err_file_name, hdu_number=hdu_number)
+                if self.phot_hst_target_name == 'ngc5194':
+                    err_hdu_number = 'WHT'
+                    hdu_number = 'SCI'
+                else:
+                    err_hdu_number = 0
+                    hdu_number = 0
+                err_data_array, err_header, err_wcs = helper_func.FileTools.load_img(file_name=err_file_name, hdu_number=err_hdu_number)
 
                 # it has to be said that in the PHANGS pipeline there are not the needed keywords in the header thus
                 # the image has to be loaded as well here:
@@ -299,8 +313,13 @@ class PhotAccess:
                 err_data[mask_bad_err] = np.nan
 
                 # rescale image to needed unit
-                err_data *= helper_func.UnitTools.get_hst_img_conv_fct(img_header=img_header, img_wcs=img_wcs,
+
+                if band in list(phys_params.hst_wfc3_ir_bands_wave.keys()):
+                    err_data *= helper_func.UnitTools.get_hst_ir_img_conv_fct(band=band, img_header=img_header, img_wcs=img_wcs,
                                                                        flux_unit=flux_unit)
+                else:
+                    err_data *= helper_func.UnitTools.get_hst_img_conv_fct(img_header=img_header, img_wcs=img_wcs,
+                                                                           flux_unit=flux_unit)
                 self.hst_bands_data.update({'%s_data_err' % band: err_data, '%s_header_err' % band: err_header,
                                             '%s_wcs_err' % band: err_wcs, '%s_unit_err' % band: flux_unit,
                                             '%s_pixel_area_size_sr_err' % band:
@@ -1130,7 +1149,6 @@ class PhotAccess:
                                                             flux_unit=flux_unit)
         scale_data, scale_header, scale_wcs = helper_func.FileTools.load_img(file_name=file_name)
         return scale_data, scale_header, scale_wcs
-
 
     def compute_apert_photometry(self, ra, dec, band, obs, flux_unit='mJy'):
 

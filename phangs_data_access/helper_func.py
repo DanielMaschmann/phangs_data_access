@@ -1,5 +1,5 @@
 """
-This script gathers function to support the HST catalog release
+This script gathers classes with methods that will be used in multiple applications
 """
 
 import os
@@ -24,6 +24,7 @@ from scipy.constants import c as speed_of_light_mps
 from scipy.spatial import ConvexHull
 from scipy import odr
 from scipy.optimize import curve_fit
+from scipy.interpolate import RegularGridInterpolator
 
 from shapely.geometry import Point
 from shapely.geometry.polygon import Polygon
@@ -112,7 +113,7 @@ class CoordTools:
                             unit=(u.hourangle, u.deg), distance=target_dist_mpc * u.Mpc)
 
     @staticmethod
-    def construct_wcs(ra_min, ra_max, dec_min, dec_max, img_shape, quadratic_image=True):
+    def construct_wcs(ra_min, ra_max, dec_min, dec_max, img_shape, quadratic_image=True, ctype=None):
         """Function to generate a WCS from scratch by only using a box of coordinates and pixel sizes.
         Parameters
         ----------
@@ -157,8 +158,10 @@ class CoordTools:
         # what is the pixel scale in lon, lat.
         new_wcs.wcs.cdelt = np.array([-ra_image_width / img_shape[1], dec_image_width / img_shape[0]])
         # you would have to determine if this is in fact a tangential projection.
-        new_wcs.wcs.ctype = ["RA---AIR", "DEC--AIR"]
-
+        if ctype is None:
+            new_wcs.wcs.ctype = ["RA---AIR", "DEC--AIR"]
+        else:
+            new_wcs.wcs.ctype = ctype
         return new_wcs
 
     @staticmethod
@@ -388,6 +391,76 @@ class UnitTools:
         return conversion_factor
 
     @staticmethod
+    def get_hst_ir_img_conv_fct(band, img_header, img_wcs, flux_unit='Jy'):
+        """
+        get unit conversion factor to go from electron counts to mJy of HST images
+        Parameters
+        ----------
+        band: str
+        img_header : ``astropy.io.fits.header.Header``
+        img_wcs : ``astropy.wcs.WCS``
+        flux_unit : str
+        no_header_conv : bool
+            this keyword is to flagg hst products which have no header information and are provided in Jy
+        Returns
+        -------
+        conversion_factor : float
+
+        """
+        # convert the flux unit
+
+        os.environ['PYSYN_CDBS'] = ('/home/benutzer/software/python_packages/phangs_data_access/meta_data/'
+                                    'wfc3_calibration_files/'
+                                    'hlsp_reference-atlases_hst_multi_everything_multi_v11_sed/grp/redcat/trds/')
+
+        import stsynphot as stsyn
+
+        vega_url = 'https://ssb.stsci.edu/trds/calspec/alpha_lyr_stis_010.fits'
+        stsyn.Vega = stsyn.spectrum.SourceSpectrum.from_file(vega_url)
+
+        mjd = img_header['ROUTTIME']
+
+        # aper = '0.385'
+        aper = '6.0'
+
+        # obsmode = f'wfc3, {detector}, {filt}, mjd#{mjd}, aper#{aper}'
+        obsmode = f'wfc3, ir, {band.lower()}, mjd#{mjd}, aper#{aper}'
+
+        bp = stsyn.band(obsmode)
+
+        photflam = bp.unit_response(stsyn.conf.area)  # inverse sensitivity in flam
+
+        photplam = bp.pivot() # pivot wavelength in angstroms
+
+        # wavelength in angstrom
+        pivot_wavelength = photplam.value
+        # inverse sensitivity, ergs/cm2/Ang/electron
+        sensitivity = photflam.value
+        # speed of light in Angstrom/s
+        c = speed_of_light_mps * 1e10
+        # change the conversion facto to get erg s−1 cm−2 Hz−1
+        f_nu = sensitivity * pivot_wavelength ** 2 / c
+        # change to get Jy
+        conversion_factor = f_nu * 1e23
+
+        pixel_area_size_sr = img_wcs.proj_plane_pixel_area().value * phys_params.sr_per_square_deg
+        # rescale data image
+        if flux_unit == 'Jy':
+            # rescale to Jy
+            conversion_factor = conversion_factor
+        elif flux_unit == 'mJy':
+            # rescale to mJy
+            conversion_factor *= 1e3
+        elif flux_unit == 'MJy/sr':
+            # get the size of one pixel in sr with the factor 1e6 for the conversion of Jy to MJy later
+            # change to MJy/sr
+            conversion_factor /= (pixel_area_size_sr * 1e6)
+        else:
+            raise KeyError('flux_unit ', flux_unit, ' not understand!')
+
+        return conversion_factor
+
+    @staticmethod
     def get_jwst_conv_fact(img_wcs, flux_unit='Jy'):
         """
         get unit conversion factor for JWST image observations
@@ -514,6 +587,28 @@ class UnitTools:
             return wave * 1e-1
         elif unit == 'mu':
             return wave * 1e-4
+        else:
+            raise KeyError('return unit not understand')
+
+    @staticmethod
+    def nanometers2unit(wave, unit='mu'):
+        """
+        Returns wavelength at needed wavelength
+        Parameters
+        ----------
+        wave : float
+        unit : str
+
+        Returns
+        -------
+        wavelength : float
+        """
+        if unit == 'angstrom':
+            return wave * 1e1
+        if unit == 'nano':
+            return wave
+        elif unit == 'mu':
+            return wave * 1e-3
         else:
             raise KeyError('return unit not understand')
 
@@ -678,16 +773,14 @@ class UnitTools:
 
     @staticmethod
     def conv_flux2lum(flux, dist_mpc):
-        dist_cm = (dist_mpc * u.Mpc).to(u.cm).value
-        return flux * (4 * np.pi) * (dist_cm ** 2)
+        dist_m = (dist_mpc * u.Mpc).to(u.cm).value
+        return flux * (4 * np.pi) * (dist_m ** 2)
 
     @staticmethod
-    def conv_flux2lum_uncertainty(flux, flux_err, dist_mpc):
+    def conv_flux2lum_uncertainty(flux_err, dist_mpc):
         dist_cm = (dist_mpc * u.Mpc).to(u.cm).value
 
-
-
-        return flux * (4 * np.pi) * (dist_cm ** 2)
+        return flux_err * (4 * np.pi) * (dist_cm ** 2)
 
 
 class TransTools:
@@ -992,7 +1085,7 @@ class FileTools:
 
         Return
         ------
-        file_name : str
+        file_name : ``pathlib.Path``
         """
         assert type(file_name) in [str, PosixPath]
         # make sure file_path is of pathlib type
@@ -1185,8 +1278,8 @@ class ObsTools:
         acs_band_list = phangs_info.hst_obs_band_dict[target]['acs']
         uvis_band_list = phangs_info.hst_obs_band_dict[target]['uvis']
         acs_uvis_band_list = phangs_info.hst_obs_band_dict[target]['acs_uvis']
-        # ir_band_list = phangs_info.hst_obs_band_dict[target]['ir']
-        band_list = acs_band_list + uvis_band_list + acs_uvis_band_list #+ ir_band_list
+        ir_band_list = phangs_info.hst_obs_band_dict[target]['ir']
+        band_list = acs_band_list + uvis_band_list + acs_uvis_band_list + ir_band_list
         wave_list = []
         for band in acs_band_list:
             wave_list.append(ObsTools.get_hst_band_wave(band=band))
@@ -1194,14 +1287,14 @@ class ObsTools:
             wave_list.append(ObsTools.get_hst_band_wave(band=band, instrument='uvis'))
         for band in acs_uvis_band_list:
             wave_list.append(ObsTools.get_hst_band_wave(band=band, instrument='uvis'))
-        # for band in ir_band_list:
-        #     wave_list.append(ObsTools.get_hst_band_wave(band=band, instrument='ir'))
+        for band in ir_band_list:
+            wave_list.append(ObsTools.get_hst_band_wave(band=band, instrument='ir'))
 
 
         return ObsTools.sort_band_list(band_list=band_list, wave_list=wave_list)
 
     @staticmethod
-    def get_hst_obs_broad_band_list(target):
+    def get_hst_obs_broad_band_list(target, allow_medium_bands=True):
         """
         gets list of bands of HST
         Parameters
@@ -1229,9 +1322,15 @@ class ObsTools:
 
         # kick out bands which are not broad bands
         for band, wave in zip(band_list, wave_list):
-            if band[-1] != 'W':
-                band_list.remove(band)
-                wave_list.remove(wave)
+            if allow_medium_bands:
+                if (band[-1] != 'W') & (band[-1] != 'M'):
+                    band_list.remove(band)
+                    wave_list.remove(wave)
+            else:
+                if band[-1] != 'W':
+                    band_list.remove(band)
+                    wave_list.remove(wave)
+
         return ObsTools.sort_band_list(band_list=band_list, wave_list=wave_list)
 
     @staticmethod
@@ -1490,9 +1589,6 @@ class ObsTools:
         else: return False
 
 
-
-
-
 class GeometryTools:
     """
     all functions related to compute hulls or check if objects are inside hulls or polygons
@@ -1700,6 +1796,26 @@ class FuncAndModels:
     def moffat2d(x, y, beta, alpha):
         return ((beta-1) / (np.pi*(alpha**2))) * (1 + ((x**2 + y**2) / (alpha**2)))**(-beta)
 
+    @staticmethod
+    def star_cluster_moffat1d(rad, mu_0, nu, fwhm):
+        """
+        This function follows the nomenclature of Thilker+2022 2022MNRAS.509.4094T
+        """
+        characteristic_rad = fwhm / 2 * (2 ** (1 / nu) - 1)
+
+        return mu_0 * (1 + rad**2 / (characteristic_rad ** 2)) ** (-nu)
+
+    @staticmethod
+    def star_cluster_moffat2d(x, y, x0, y0, mu_0, nu, fwhm):
+        """
+        This function follows the nomenclature of Thilker+2022 2022MNRAS.509.4094T
+        """
+        rad = np.sqrt((x - x0)**2 + (y - y0)**2)
+
+        characteristic_rad = fwhm / 2 * (2 ** (1 / nu) - 1)
+
+        return mu_0 * (1 + rad**2 / (characteristic_rad ** 2)) ** (-nu)
+
 
 class FitTools:
     @staticmethod
@@ -1710,6 +1826,10 @@ class FitTools:
     @staticmethod
     def gaussian_func(x_data, amp, mu, sig):
         return amp * np.exp(-(x_data - mu) ** 2 / (2 * sig ** 2))
+
+    @staticmethod
+    def super_pos_two_gaussian_func(x_data, amp_1, amp_2, mu, sig_1, sig_2):
+        return amp_1 * np.exp(-(x_data - mu) ** 2 / (2 * sig_1 ** 2)) + amp_2 * np.exp(-(x_data - mu) ** 2 / (2 * sig_2 ** 2))
 
     @staticmethod
     def fit_line(x_data, y_data, x_data_err, y_data_err):
@@ -1780,16 +1900,105 @@ class FitTools:
         amp, mu, sig = popt
         amp_err, mu_err, sig_err = perr
 
-        # print(amp, mu, sig)
-
-
         return {'amp': amp, 'mu': mu, 'sig': sig, 'amp_err': amp_err, 'mu_err': mu_err, 'sig_err': sig_err}
 
+    @staticmethod
+    def fit_super_pos_two_gaussian(x_data, y_data, y_data_err=None,
+                                   amp_1_guess=1, amp_2_guess=1, mu_guess=0, sig_1_guess=1, sig_2_guess=1,
+                                   lower_amp_1=np.inf*-1, upper_amp_1=np.inf,
+                                   lower_amp_2=np.inf*-1, upper_amp_2=np.inf,
+                                   lower_mu=np.inf*-1, upper_mu=np.inf,
+                                   lower_sigma_1=0, upper_sigma_1=np.inf,
+                                   lower_sigma_2=0, upper_sigma_2=np.inf):
 
 
+        initial_guess = [amp_1_guess, amp_2_guess, mu_guess, sig_1_guess, sig_2_guess]
+        bounds = ([lower_amp_1, lower_amp_2, lower_mu, lower_sigma_1, lower_sigma_2],
+                  [upper_amp_1, upper_amp_2, upper_mu, upper_sigma_1, upper_sigma_2])  # (lower bounds, upper bounds)
+
+        popt, pcov = curve_fit(f=FitTools.super_pos_two_gaussian_func, xdata=x_data, ydata=y_data, sigma=y_data_err,
+                               p0=initial_guess, bounds=bounds, nan_policy='omit')
+
+        perr = np.sqrt(np.diag(pcov))
+
+        amp_1, amp_2, mu, sig_1, sig_2 = popt
+        amp_1_err, amp_2_err, mu_err, sig_1_err, sig_2_err = perr
+
+        return {
+            'amp_1': amp_1, 'amp_2': amp_2, 'mu': mu, 'sig_1': sig_1, 'sig_2': sig_2,
+            'amp_1_err': amp_1_err, 'amp_2_err': amp_2_err, 'mu_err': mu_err, 'sig_1_err': sig_1_err,
+            'sig_2_err': sig_2_err,
+        }
 
 
+class InterpTools:
+    """
+    Mainly for 2d interpolations
+    """
 
+    @staticmethod
+    def interp2dgrid(x_bins, y_bins, func_values, method='linear'):
+        """
+        This function will only return the Scipy function RegularGridInterpolator
+
+
+        Parameters
+        ----------
+        x_bins : array_like
+        y_bins : array_like
+        func_values : array_like
+
+        method : str, optional
+        The method of interpolation to perform. Supported are "linear",
+        "nearest", "slinear", "cubic", "quintic" and "pchip". This
+        parameter will become the default for the object's ``__call__``
+        method. Default is "linear".
+        """
+
+        return RegularGridInterpolator((x_bins, y_bins), func_values, method)
+
+    @staticmethod
+    def get2dinterp_value(interp_func, x_val, y_val):
+        """
+        This function will only return the Scipy function RegularGridInterpolator
+
+
+        Parameters
+        ----------
+        interp_func : ``scipy.interpolate.RegularGridInterpolator``
+        x_val : float
+        y_val : float
+
+        """
+
+        return interp_func([x_val, y_val])
+
+
+    @staticmethod
+    def get2dinterp_fine_grid(interp_func, x_min, x_max, y_min, y_max, n_x_bins=100, n_y_bins=100):
+        """
+        This function will only return the Scipy function RegularGridInterpolator
+
+
+        Parameters
+        ----------
+        interp_func : ``scipy.interpolate.RegularGridInterpolator``
+        x_min : float
+        x_max : float
+        y_min : float
+        y_max : float
+        n_x_bins : int
+        n_y_bins : int
+
+        """
+        # get the meshgrid
+        x_fine = np.linspace(x_min, x_max, n_x_bins)
+        y_fine = np.linspace(y_min, y_max, n_y_bins)
+        x_fine, y_fine = np.meshgrid(x_fine, y_fine)
+
+        # Evaluate the interpolator on the finer grid
+        points_fine = np.array([x_fine.ravel(), y_fine.ravel()]).T
+        return interp_func(points_fine).reshape(x_fine.shape)
 
 
 

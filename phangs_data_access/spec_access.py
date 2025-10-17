@@ -10,7 +10,7 @@ from astropy.wcs import WCS
 import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
-from spectral_cube import SpectralCube
+# from spectral_cube import SpectralCube
 
 from TardisPipeline.readData.MUSE_WFM import get_MUSE_polyFWHM
 from phangs_data_access import phangs_access_config, helper_func, phangs_info

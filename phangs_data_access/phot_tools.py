@@ -7,8 +7,8 @@ import numpy as np
 from pathlib import Path
 import pickle
 
-from photutils import aperture_photometry
-from photutils import CircularAperture, CircularAnnulus
+from photutils.aperture import aperture_photometry
+from photutils.aperture import CircularAperture, CircularAnnulus
 from photutils.profiles import RadialProfile, CurveOfGrowth
 from photutils.aperture import SkyCircularAperture, SkyCircularAnnulus, CircularAnnulus, CircularAperture
 from photutils.aperture import ApertureStats
@@ -344,6 +344,54 @@ class PSFTools:
         interp_func = interp1d(psf_correction_dict[used_band]['measured_std_values'], psf_correction_dict[used_band]['measured_ee_value'])
         return interp_func(std)
 
+    @staticmethod
+    def get_apert_gauss_corr_fact(band, instrument, apert_rad, std):
+        # load the EE dict
+        path2psf_data = (Path(__file__).parent.parent.resolve() / 'meta_data' / 'psf_data' / 'data_output' /
+                         'apert_gauss_corr')
+        if instrument == 'acs':
+            apert_gauss_corr_file_name = 'acs_wfc_apert_gauss_corr_dict.pickle'
+            used_band = PSFTools.get_closest_available_hst_psf_filter(band=band, instrument=instrument)
+        elif instrument == 'uvis':
+            apert_gauss_corr_file_name = 'wfc3_uv_apert_gauss_corr_dict.pickle'
+            used_band = PSFTools.get_closest_available_hst_psf_filter(band=band, instrument=instrument)
+        elif instrument == 'ir':
+            apert_gauss_corr_file_name = 'wfc3_ir_apert_gauss_corr_dict.pickle'
+            used_band = PSFTools.get_closest_available_hst_psf_filter(band=band, instrument=instrument)
+        elif instrument == 'nircam':
+            apert_gauss_corr_file_name = 'nircam_apert_gauss_corr_dict.pickle'
+            used_band = band
+        elif instrument == 'miri':
+            apert_gauss_corr_file_name = 'miri_apert_gauss_corr_dict.pickle'
+            used_band = band
+        else:
+            raise KeyError(instrument, ' not understood as instrument keyword')
+
+        # apert_gauss_corr_dict = pickle.load(apert_gauss_corr_file_name)
+        with open(path2psf_data / apert_gauss_corr_file_name, 'rb') as file_name:
+            apert_gauss_corr_dict = pickle.load(file_name)
+
+        # get the interpolation_function
+        interp_func = helper_func.InterpTools.interp2dgrid(
+            x_bins=apert_gauss_corr_dict[used_band]['apert_radii_arcsec_list'],
+            y_bins=apert_gauss_corr_dict[used_band]['measured_std_values'],
+            func_values=apert_gauss_corr_dict[used_band]['measured_flux_frac_in_apert'],
+            method='cubic')
+
+        if std < np.min(apert_gauss_corr_dict[used_band]['measured_std_values']):
+            std = np.min(apert_gauss_corr_dict[used_band]['measured_std_values'])
+        if std > np.max(apert_gauss_corr_dict[used_band]['measured_std_values']):
+            std = np.max(apert_gauss_corr_dict[used_band]['measured_std_values']) * 0.999
+            too_extended_flag = True
+        else:
+            too_extended_flag = False
+
+        corr_fact = 1 / helper_func.InterpTools.get2dinterp_value(interp_func=interp_func, x_val=apert_rad, y_val=std)
+
+        return corr_fact, too_extended_flag
+
+
+
 
 class ProfileTools:
     """
@@ -401,6 +449,33 @@ class ProfileTools:
             rad_profile_stats['profile_err'] /= np.nanmax(rad_profile_stats['profile'])
             rad_profile_stats['profile'] /= np.nanmax(rad_profile_stats['profile'])
         return rad_profile_stats['rad'], rad_profile_stats['profile'], rad_profile_stats['profile_err']
+
+    @staticmethod
+    def get_curve_of_growth(data, x_pos, y_pos, max_rad, err=None, norm_profile=True, pix_scale=None, method='exact'):
+        edge_radii = np.arange(int(max_rad))[1:]
+        cog = CurveOfGrowth(data, xycen=(x_pos, y_pos), radii=edge_radii, error=err, mask=None, method=method)
+        if norm_profile:
+            cog.normalize()
+
+        cog_rad = np.array(cog.radius)
+        cog_profile = cog.profile
+        cog_profile_err = cog.profile_error
+        if pix_scale is not None:
+            cog_rad = cog_rad * pix_scale
+
+        return cog_rad, cog_profile, cog_profile_err
+
+    @staticmethod
+    def get_curve_of_growth_from_img(img, wcs, ra, dec, max_rad_arcsec, img_err=None, norm_profile=True, method='exact'):
+        central_pos = wcs.world_to_pixel(SkyCoord(ra=ra * u.deg, dec=dec * u.deg))
+
+        max_rad_pix = helper_func.CoordTools.transform_world2pix_scale(length_in_arcsec=max_rad_arcsec, wcs=wcs, dim=0)
+        # get pixel_scale
+        pixel_scale = wcs.proj_plane_pixel_scales()[0].value * 3600
+        cog_rad, cog_profile, cog_profile_err = ProfileTools.get_curve_of_growth(
+            data=img, x_pos=central_pos[0], y_pos=central_pos[1], max_rad=max_rad_pix, err=img_err,
+            norm_profile=norm_profile, pix_scale=pixel_scale, method=method)
+        return cog_rad, cog_profile, cog_profile_err
 
     @staticmethod
     def get_src_ee(data, x_pos, y_pos, max_rad, ee_values, err=None, pix_scale=None, method='exact'):
@@ -517,7 +592,7 @@ class ProfileTools:
             max_rad_arcsec=max_rad_arcsec,
             img_err=img_err,
             img_mask=img_mask,
-            norm_profile=True)
+            norm_profile=False)
 
         # get profiles along a slit
         slit_profile_dict = ProfileTools.compute_axis_profiles_from_img(
@@ -527,8 +602,10 @@ class ProfileTools:
         return {'rad': rad, 'profile': profile, 'profile_err': profile_err, 'slit_profile_dict': slit_profile_dict}
 
     @staticmethod
-    def fit_gauss2rad_profiles(rad_profile_dict, std_pix, upper_sig_fact=10, central_rad_fact=5, ):
-        radius_of_interes = float(std_pix * central_rad_fact)
+    def fit_gauss2rad_profiles(rad_profile_dict, std_pix, upper_sig_fact=10, central_rad_fact=5, radius_of_interest=None):
+
+        if radius_of_interest is None:
+            radius_of_interest = float(std_pix * central_rad_fact)
 
         amp_list = []
         mu_list = []
@@ -546,8 +623,8 @@ class ProfileTools:
             # plt.plot(rad_profile_dict[str(idx)]['radius_data'], rad_profile_dict[str(idx)]['profile_data'])
             # plt.show()
 
-            central_pix = ((rad_profile_dict[str(idx)]['radius_data'] > radius_of_interes * -1) &
-                           (rad_profile_dict[str(idx)]['radius_data'] < radius_of_interes))
+            central_pix = ((rad_profile_dict[str(idx)]['radius_data'] > radius_of_interest * -1) &
+                           (rad_profile_dict[str(idx)]['radius_data'] < radius_of_interest))
             good_pix = np.invert(rad_profile_dict[str(idx)]['profile_mask'])
 
             # there must be at least half of the data points with a signal
@@ -643,6 +720,299 @@ class ProfileTools:
         # plt.show()
 
         return amp_list, mu_list, sig_list, amp_err_list, mu_err_list, sig_err_list
+
+    @staticmethod
+    def fit_double_gauss2rad_profiles(rad_profile_dict, std_pix, max_val_in_apert, rad_of_interest,
+                                      upper_sig_1_fact=4, upper_sig_2_fact=10):
+
+        # if there is really no signal in the aperture there is no point in fitting a profile
+        if max_val_in_apert < 0:
+            return None, None, None, None, None, None, None, None, None, None
+
+
+        amp_1_list = []
+        amp_2_list = []
+        mu_list = []
+        sig_1_list = []
+        sig_2_list = []
+        amp_1_err_list = []
+        amp_2_err_list = []
+        mu_err_list = []
+        sig_1_err_list = []
+        sig_2_err_list = []
+
+        # import matplotlib.pyplot as plt
+        # fig, ax = plt.subplots(nrows=len(rad_profile_dict['list_angle_idx']) +1)
+
+        for idx in rad_profile_dict['list_angle_idx']:
+            # plt.plot(rad_profile_dict[str(idx)]['radius_data'], rad_profile_dict[str(idx)]['profile_data'])
+            # plt.show()
+
+            central_pix = ((rad_profile_dict[str(idx)]['radius_data'] > rad_of_interest * -1) &
+                           (rad_profile_dict[str(idx)]['radius_data'] < rad_of_interest))
+            good_pix = np.invert(rad_profile_dict[str(idx)]['profile_mask'])
+
+            # there must be at least half of the data points with a signal
+            if sum(good_pix[central_pix]) < int(sum(central_pix) / 2):
+                amp_1_list.append(np.nan)
+                amp_1_list.append(np.nan)
+                mu_list.append(np.nan)
+                sig_1_list.append(np.nan)
+                sig_2_list.append(np.nan)
+
+                amp_1_err_list.append(np.nan)
+                amp_2_err_list.append(np.nan)
+                mu_err_list.append(np.nan)
+                sig_1_err_list.append(np.nan)
+                sig_2_err_list.append(np.nan)
+                continue
+
+            mask_pixels_to_fit = central_pix * good_pix
+
+            # get limits and guesses for amplitude
+            lower_amp_1 = max_val_in_apert / 10
+            lower_amp_2 = 0
+            upper_amp_1 = max_val_in_apert * 2
+            upper_amp_2 = max_val_in_apert * 0.1
+
+
+            # ax[idx].scatter(rad_profile_dict[str(idx)]['radius_data'],
+            #              rad_profile_dict[str(idx)]['profile_data'],
+            #              color='gray')
+            # ax[-1].plot(rad_profile_dict[str(idx)]['radius_data'],
+            #              rad_profile_dict[str(idx)]['profile_data'],
+            #              color='gray')
+            #
+            # ax[idx].errorbar(rad_profile_dict[str(idx)]['radius_data'],
+            #          rad_profile_dict[str(idx)]['profile_data'],
+            #              yerr=rad_profile_dict[str(idx)]['profile_err'],
+            #          fmt='.')
+            # plt.plot(rad_profile_dict[str(idx)]['radius_data'],
+            #              rad_profile_dict[str(idx)]['profile_data'],
+            #              color='gray')
+            # plt.show()
+
+            # select the lower amplitude. There is a chance that the values are negative
+            #
+            # plt.plot(rad_profile_dict[str(idx)]['radius_data'],
+            #              rad_profile_dict[str(idx)]['profile_data'],
+            #              color='gray')
+
+            # fit
+            try:
+                # print('max_val_in_apert', max_val_in_apert)
+                # print('amp_1_guess ', max_val_in_apert)
+                # print('amp_2_guess ', max_val_in_apert * 0.1)
+                # print('sig_1_guess ', std_pix)
+                # print('sig_2_guess ', std_pix*5)
+                #
+                #
+                #
+                # print('lim_amp_1', lower_amp_1, upper_amp_1)
+                # print('lim_amp_2', lower_amp_2, upper_amp_2)
+                # print('lim_sigma_1', std_pix, std_pix * upper_sig_1_fact)
+                # print('lim_sigma_2', std_pix, std_pix * upper_sig_2_fact)
+
+                gaussian_fit_dict = helper_func.FitTools.fit_super_pos_two_gaussian(
+                    x_data=rad_profile_dict[str(idx)]['radius_data'][mask_pixels_to_fit],
+                    y_data=rad_profile_dict[str(idx)]['profile_data'][mask_pixels_to_fit],
+                    y_data_err=rad_profile_dict[str(idx)]['profile_err'][mask_pixels_to_fit],
+                    amp_1_guess=max_val_in_apert, amp_2_guess=max_val_in_apert * 0.01,
+                    mu_guess=0, sig_1_guess=std_pix, sig_2_guess=std_pix*3,
+                    lower_amp_1=lower_amp_1, upper_amp_1=upper_amp_1,
+                    lower_amp_2=lower_amp_2, upper_amp_2=upper_amp_2,
+                    lower_mu=std_pix * -5, upper_mu=std_pix * 5,
+                    lower_sigma_1=std_pix, upper_sigma_1=std_pix * upper_sig_1_fact,
+                    lower_sigma_2=std_pix, upper_sigma_2=std_pix * upper_sig_2_fact)
+
+                amp_1_list.append(gaussian_fit_dict['amp_1'])
+                amp_2_list.append(gaussian_fit_dict['amp_2'])
+                mu_list.append(gaussian_fit_dict['mu'])
+                sig_1_list.append(gaussian_fit_dict['sig_1'])
+                sig_2_list.append(gaussian_fit_dict['sig_2'])
+
+                amp_1_err_list.append(gaussian_fit_dict['amp_1_err'])
+                amp_2_err_list.append(gaussian_fit_dict['amp_2_err'])
+                mu_err_list.append(gaussian_fit_dict['mu_err'])
+                sig_1_err_list.append(gaussian_fit_dict['sig_1_err'])
+                sig_2_err_list.append(gaussian_fit_dict['sig_2_err'])
+
+                # print('amp_1', gaussian_fit_dict['amp_1'])
+                # print('amp_2', gaussian_fit_dict['amp_2'])
+                # print('mu', gaussian_fit_dict['mu'])
+                # print('sig_1', gaussian_fit_dict['sig_1'])
+                # print('sig_2', gaussian_fit_dict['sig_2'])
+                #
+                # print('------------------------')
+
+            except RuntimeError:
+                amp_1_list.append(np.nan)
+                amp_2_list.append(np.nan)
+                mu_list.append(np.nan)
+                sig_1_list.append(np.nan)
+                sig_2_list.append(np.nan)
+
+                amp_1_err_list.append(np.nan)
+                amp_2_err_list.append(np.nan)
+                mu_err_list.append(np.nan)
+                sig_1_err_list.append(np.nan)
+                sig_2_err_list.append(np.nan)
+
+            # plt.scatter(rad_profile_dict['list_angles'][idx], gaussian_fit_dict['sig'])
+
+            # if (gaussian_fit_dict['amp'] > 0) & (np.abs(gaussian_fit_dict['mu']) < std_pix * 3):
+            #
+            #     dummy_rad = np.linspace(np.min(rad_profile_dict[str(idx)]['radius_data']),
+            #                             np.max(rad_profile_dict[str(idx)]['radius_data']), 500)
+            #     gauss = helper_func.FitTools.gaussian_func(
+            #         amp=gaussian_fit_dict['amp'], mu=gaussian_fit_dict['mu'], sig=gaussian_fit_dict['sig'], x_data=dummy_rad)
+            #
+            #     # ax[idx].plot(dummy_rad, gauss, color='r')
+            #     plt.plot(dummy_rad, gauss)
+
+            # get the fit results
+            # amp_list.append(gaussian_fit_dict['amp'])
+            # mu_list.append(gaussian_fit_dict['mu'])
+            # sig_list.append(gaussian_fit_dict['sig'])
+            #
+            # amp_err_list.append(gaussian_fit_dict['amp_err'])
+            # mu_err_list.append(gaussian_fit_dict['mu_err'])
+            # sig_err_list.append(gaussian_fit_dict['sig_err'])
+
+        # plt.show()
+
+        return (amp_1_list, amp_2_list, mu_list, sig_1_list, sig_2_list,
+                amp_1_err_list, amp_2_err_list, mu_err_list, sig_1_err_list, sig_2_err_list)
+
+    @staticmethod
+    def get_best_gaussian_profile_params(amp_list, mu_list, sig_list,
+                                         peak_acceptance_rad_pix, n_good_fits_needed=4):
+        #check if list is empty:
+        if not amp_list:
+
+            best_gauss_dict = {
+                'mean_amp': np.nan,
+                'mean_mu': np.nan,
+                'mean_sig': np.nan,
+                'good_fit_flag': False,
+                'mask_good_fits': None,
+                'n_successful_fits': 0
+            }
+            return best_gauss_dict
+
+        # switch to arrays
+        amp_list = np.array(amp_list)
+        mu_list = np.array(mu_list)
+        sig_list = np.array(sig_list)
+
+        # get all the gaussian functions that make sense
+        # then need to be central
+        mask_mu = np.abs(mu_list) < peak_acceptance_rad_pix
+        # they must have a positive amplitude
+        mask_amp = (amp_list > 0)
+
+        mask_good_fits = mask_mu * mask_amp
+
+        # if no function was detected in the center
+        if sum(mask_good_fits) == 0:
+            mean_amp = np.nan
+            mean_mu = np.nan
+            mean_sig = np.nan
+            good_fit_flag = False
+            n_successful_fits = 0
+
+        else:
+
+            mean_amp = np.nanmean(amp_list[mask_good_fits])
+            mean_mu = np.nanmean(mu_list[mask_good_fits])
+            mean_sig = np.nanmean(sig_list[mask_good_fits])
+
+            if sum(mask_good_fits) < n_good_fits_needed:
+                good_fit_flag = False
+            else:
+                good_fit_flag = True
+            n_successful_fits = sum(mask_good_fits)
+
+
+        best_gauss_dict = {
+            'mean_amp': mean_amp,
+            'mean_mu': mean_mu,
+            'mean_sig': mean_sig,
+            'good_fit_flag': good_fit_flag,
+            'mask_good_fits': mask_good_fits,
+            'n_successful_fits': n_successful_fits
+        }
+        return best_gauss_dict
+
+    @staticmethod
+    def get_best_double_gaussian_profile_params(amp_1_list, amp_2_list, mu_list, sig_1_list, sig_2_list,
+                                         peak_acceptance_rad_pix, n_good_fits_needed=4):
+        #check if list is empty:
+        if not amp_1_list:
+
+            best_gauss_dict = {
+                'mean_amp_1': np.nan,
+                'mean_amp_2': np.nan,
+                'mean_mu': np.nan,
+                'mean_sig_1': np.nan,
+                'mean_sig_2': np.nan,
+                'good_fit_flag': False,
+                'mask_good_fits': None,
+                'n_successful_fits': 0
+            }
+            return best_gauss_dict
+
+        # switch to arrays
+        amp_1_list = np.array(amp_1_list)
+        amp_2_list = np.array(amp_2_list)
+        mu_list = np.array(mu_list)
+        sig_1_list = np.array(sig_1_list)
+        sig_2_list = np.array(sig_2_list)
+
+        # get all the gaussian functions that make sense
+        # then need to be central
+        mask_mu = np.abs(mu_list) < peak_acceptance_rad_pix
+        # they must have a positive amplitude
+        mask_amp = (amp_1_list > 0) & (amp_2_list > 0)
+
+        mask_good_fits = mask_mu * mask_amp
+
+        # if no function was detected in the center
+        if sum(mask_good_fits) == 0:
+            mean_amp_1 = np.nan
+            mean_amp_2 = np.nan
+            mean_mu = np.nan
+            mean_sig_1 = np.nan
+            mean_sig_2 = np.nan
+            good_fit_flag = False
+            n_successful_fits = 0
+
+        else:
+
+            mean_amp_1 = np.nanmean(amp_1_list[mask_good_fits])
+            mean_amp_2 = np.nanmean(amp_2_list[mask_good_fits])
+            mean_mu = np.nanmean(mu_list[mask_good_fits])
+            mean_sig_1 = np.nanmean(sig_1_list[mask_good_fits])
+            mean_sig_2 = np.nanmean(sig_2_list[mask_good_fits])
+
+            if sum(mask_good_fits) < n_good_fits_needed:
+                good_fit_flag = False
+            else:
+                good_fit_flag = True
+            n_successful_fits = sum(mask_good_fits)
+
+
+        best_gauss_dict = {
+            'mean_amp_1': mean_amp_1,
+            'mean_amp_2': mean_amp_2,
+            'mean_mu': mean_mu,
+            'mean_sig_1': mean_sig_1,
+            'mean_sig_2': mean_sig_2,
+            'good_fit_flag': good_fit_flag,
+            'mask_good_fits': mask_good_fits,
+            'n_successful_fits': n_successful_fits
+        }
+        return best_gauss_dict
 
     @staticmethod
     def measure_morph_photometry(topo_dict, band, instrument, x_center, ycenter, rad_profile_dict, std_pix,
@@ -753,12 +1123,12 @@ class ProfileTools:
             n_successful_fits = sum(mask_mu * mask_amp)
 
         # get correction factors
-        sig_parcsec = helper_func.CoordTools.transform_pix2world_scale(length_in_pix=sig, wcs=topo_dict['wcs'])
+        sig_arcsec = helper_func.CoordTools.transform_pix2world_scale(length_in_pix=sig, wcs=topo_dict['wcs'])
         # print(detect_flag, good_fit_flag, n_successful_fits)
-        # print(sig_parcsec, topo_dict['psf_std'])
+        # print(sig_arcsec, topo_dict['psf_std'])
 
         # correct for PSF size and gaussian approximation
-        flux_corr_fact = PSFTools.get_psf_gauss_corr_fact(band=band, instrument=instrument, std=sig_parcsec)
+        flux_corr_fact = PSFTools.get_psf_gauss_corr_fact(band=band, instrument=instrument, std=sig_arcsec)
         flux /= flux_corr_fact
         flux_err /= flux_corr_fact
 
@@ -789,15 +1159,15 @@ class ProfileTools:
         # print(psf_dict['gaussian_fwhm'])
         # print(psf_dict['gaussian_std'])
 
-        radius_of_interes = gauss_std * 3
+        radius_of_interest = gauss_std * 3
 
         central_apert_stats_source = ApertTools.get_sky_apert_stats(data=img - bkg, data_err=img_err,
                                                                                wcs=wcs,
                                                                                ra=ra, dec=dec,
-                                                                               aperture_rad_arcsec=radius_of_interes)
+                                                                               aperture_rad_arcsec=radius_of_interest)
         central_apert_stats_bkg = ApertTools.get_sky_apert_stats(data=bkg, data_err=img_err, wcs=wcs,
                                                                             ra=ra, dec=dec,
-                                                                            aperture_rad_arcsec=radius_of_interes)
+                                                                            aperture_rad_arcsec=radius_of_interest)
 
         amp_list = []
         mu_list = []
@@ -1233,6 +1603,7 @@ class ApertTools:
             (pow(bkg_err * area_apert, 2) / area_annulus) * np.pi / 2)
 
         flux_dict = {
+            'apert_flux': apert_flux,
             'src_flux': src_flux,
             'src_flux_err': src_flux_err,
             'flux_measure_ok_flag': flux_measure_ok_flag,

@@ -81,7 +81,7 @@ for band in acs_wfc_band_list:
             # the PSF itself
             'over_sampled_psf': mean_psf,
             'pixel_scale_psf_over_sampled': (pixel_size_acs_wfc / super_sample_factor_acs_wfc),
-            'n_over_sampled' : super_sample_factor_acs_wfc,
+            'n_over_sampled': super_sample_factor_acs_wfc,
             # parametrization of the radial profile
             'radius_arcsec': rad_profile_stat_dict['rad'],
             'psf_profile': rad_profile_stat_dict['profile'],
@@ -112,7 +112,12 @@ for band in wfc3_uv_band_list:
 
     hdu = fits.open(f'data/WFC3UV/STDPSF_WFC3UV_{band}.fits')
     data = hdu[0].data
-    mean_psf = np.mean(data, axis=0)
+    mean_psf = np.abs(np.mean(data, axis=0))
+
+    # plt.clf()
+    # plt.cla()
+    # plt.imshow(np.log10(mean_psf))
+    # plt.show()
 
 
     central_x_pos = mean_psf.shape[0]/2

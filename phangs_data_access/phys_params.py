@@ -333,7 +333,9 @@ nirspec_gratings = {
 # hst
 # The aperture sizes are 4 pixels for each band. The background is estimated between 7 and 9 pixels
 # this is explained in Deger+2022 (2022MNRAS.510...32D)
-hst_aperture_rad_pix = {'F275W': 4, 'F336W': 4, 'F435W': 4, 'F438W': 4, 'F555W': 4,  'F547M': 4, 'F657N': 4, 'F658N': 4, 'F689M': 4, 'F814W': 4}
+hst_aperture_rad_pix = {'F275W': 4, 'F336W': 4, 'F435W': 4, 'F438W': 4, 'F555W': 4,  'F547M': 4, 'F606W': 4, 'F657N': 4,
+                        'F658N': 4, 'F689M': 4, 'F814W': 4,
+                        'F110W': 4, 'F128N': 4}
 
 hst_bkg_annulus_radii_pix = {'rad_in': 7., 'rad_out': 9.}
 

@@ -80,7 +80,7 @@ class DustTools:
             wave = helper_func.ObsTools.get_hst_band_wave(
                 band=band, instrument=helper_func.ObsTools.get_hst_instrument(target=target, band=band),
                 wave_estimator=wave_estimator, unit='mu') * u.micron
-        elif obs in ['nircam', 'miri']  :
+        elif obs in ['nircam', 'miri']:
             wave = helper_func.ObsTools.get_jwst_band_wave(
                 band=band, instrument=obs,
                 wave_estimator=wave_estimator, unit='mu') * u.micron

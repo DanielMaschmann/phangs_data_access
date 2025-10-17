@@ -78,6 +78,11 @@ phangs_kcwi_galaxy_list = [
     'ngc0628', 'ngc1087', 'ngc1300', 'ngc1385', 'ngc2835', 'ngc3239', 'ngc5068'
 ]
 
+phangs_chandra_galaxy_list = [
+    'ic5332', 'ngc0628', 'ngc1087', 'ngc1300', 'ngc1365', 'ngc1433', 'ngc1512',  'ngc1566', 'ngc1672',
+    'ngc2835', 'ngc3351', 'ngc3627', 'ngc4254', 'ngc4303', 'ngc4321', 'ngc4535', 'ngc5068', 'ngc5194'
+]
+
 
 #################################################################
 ##### specific observation available for individual targets #####
@@ -389,7 +394,9 @@ hst_obs_band_dict = {
         {'acs': ['F435W', 'F555W', 'F814W', 'F658N'],
          'uvis': ['F275W', 'F336W', 'F689M'],
          'acs_uvis': [],
-         'ir': ['F110W', 'F128N']},
+         'ir': [
+             #'F110W', 'F128N'
+                ]},
     'ngc5248':
         {'acs': [],
          'uvis': ['F275W', 'F336W', 'F438W', 'F555W', 'F657N', 'F814W'],
@@ -569,7 +576,7 @@ jwst_obs_band_dict_v2p0 = {
     'ngc4457': {'nircam_observed_bands': ['F150W', 'F187N', 'F300M', 'F335M'],
                 'miri_observed_bands': ['F770W', 'F2100W']},
     'ngc4496a': {'nircam_observed_bands': ['F150W', 'F200W', 'F300M', 'F335M'],
-                'miri_observed_bands': ['F770W', 'F2100W']},
+                 'miri_observed_bands': ['F770W', 'F2100W']},
     'ngc4535': {'nircam_observed_bands': ['F200W', 'F300M', 'F335M', 'F360M'],
                 'miri_observed_bands': ['F770W', 'F1000W', 'F1130W', 'F2100W']},
     'ngc4536': {'nircam_observed_bands': ['F150W', 'F200W', 'F300M', 'F335M'],
@@ -625,7 +632,7 @@ jwst_obs_band_dict_v0p2 = {
 }
 
 jwst_obs_band_dict_v0p3 = {
-    'ngc5194': {'nircam_observed_bands': ['F115W', 'F140M', 'F150W', 'F164N', 'F182M', 'F187N', 'F200W', 'F210M', 'F212N', 'F250M', 'F300M', 'F335M', 'F360M', 'F405N', 'F430M', 'F444W'],
+        'ngc5194': {'nircam_observed_bands': ['F115W', 'F140M', 'F150W', 'F164N', 'F182M', 'F187N', 'F200W', 'F210M', 'F212N', 'F250M', 'F300M', 'F335M', 'F360M', 'F405N', 'F430M', 'F444W'],
                 'miri_observed_bands': []}
 }
 
